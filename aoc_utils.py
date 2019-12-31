@@ -1,0 +1,49 @@
+import os
+import requests
+from datetime import datetime
+
+cookies = {
+		"session": "53616c7465645f5fccd9485a284ad61376ad129d04887b967bf50d5f045f61f5bb80809a64a61d3be2581621734a2e86"
+	}
+
+def download_input(day=None, year=None, url=None):
+	if not url:
+		day = day if day else datetime.now().day
+		year = year if year else datetime.now().year
+		url = "https://adventofcode.com/%d/day/%d/input" % (year, day)
+	
+	try:
+		print("Downloading...")
+		read = requests.get(url, cookies=cookies)
+		data = [chunk for chunk in read.iter_content(chunk_size=512)]
+		data = b"".join(data).decode()
+		print("Done!")
+		return data
+	except requests.RequestException as e:
+		print("Error :%s" % e)
+		return None
+
+
+def get_input(day=None, year=None):
+	filename = "input%02d.txt" % day
+	if os.path.isfile(filename):
+		print("Reading local '%s'..." % filename)
+		with open(filename) as f:
+			data = f.read()
+		print("Done!")
+	else:
+		print("No local file.")
+		data = download_input(day, year)
+		if not data:
+			return None
+		print("Storing locally as '%s'..." % filename)
+		with open(filename, "w") as f:
+			f.write(data)
+		print("Done!")
+	return data
+
+
+if __name__ == "__main__":
+	data = get_input(1)
+	print("---- 1 ----")
+	print(data)
