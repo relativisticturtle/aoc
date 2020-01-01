@@ -1,9 +1,8 @@
 import os
 import sys
-import clipboard
 ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(ROOT)
-from aoc_utils import get_input
+from aoc_utils import get_input, clipboard_set
 
 #import numpy as np
 #from collections import deque
@@ -19,7 +18,7 @@ def run(indata):
 		if w > 5:
 			fuel += int(w/3) - 2
 	print("Part 1: {}".format(fuel))
-	clipboard.set("{}".format(fuel))
+	clipboard_set("{}".format(fuel))
 	
 	# ----------- PART 2 -----------
 	#
@@ -30,7 +29,7 @@ def run(indata):
 			fuel += int(w/3) - 2
 			w = int(w/3) - 2
 	print("Part 2: {}".format(fuel))
-	clipboard.set("{}".format(fuel))
+	clipboard_set("{}".format(fuel))
 
 
 if __name__ == '__main__':

@@ -1,9 +1,8 @@
 import os
 import sys
-import clipboard
 ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(ROOT)
-from aoc_utils import get_input
+from aoc_utils import get_input, clipboard_set
 
 import numpy as np
 #from collections import deque
@@ -36,7 +35,7 @@ def run(indata):
 	for x in X:
 		ans1 = min(abs(x[0])+abs(x[1]), ans1)
 	print("Part 1: {}".format(ans1))
-	clipboard.set("{}".format(ans1))
+	clipboard_set("{}".format(ans1))
 	
 	# ----------- PART 2 -----------
 	#
@@ -46,7 +45,7 @@ def run(indata):
 	for x in X:
 		ans2 = min(T1[x]+T2[x], ans2)
 	print("Part 2: {}".format(ans2))
-	clipboard.set("{}".format(ans2))
+	clipboard_set("{}".format(ans2))
 
 
 if __name__ == '__main__':

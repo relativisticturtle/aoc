@@ -43,6 +43,19 @@ def get_input(day=None, year=None):
 	return data
 
 
+def clipboard_set(text):
+	try:
+		import clipboard
+		if hasattr(clipboard, "set"):
+			clipboard.set(text)
+		elif hasattr(clipboard, "copy"):
+			clipboard.copy(text)
+		else:
+			print("Warning: couldn't copy to clipboard")
+	except ImportError:
+		print("Warning: no clipboard module")
+
+
 if __name__ == "__main__":
 	data = get_input(1)
 	print("---- 1 ----")

@@ -1,9 +1,8 @@
 import os
 import sys
-import clipboard
 ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(ROOT)
-from aoc_utils import get_input
+from aoc_utils import get_input, clipboard_set
 import IntCode
 
 #import numpy as np
@@ -20,7 +19,7 @@ def run(indata):
 	machine.run(print_code=False)
 	ans1 = machine.output[-1]
 	print("Part 1: {}".format(ans1))
-	clipboard.set("{}".format(ans1))
+	clipboard_set("{}".format(ans1))
 	
 	# ----------- PART 2 -----------
 	#
@@ -29,7 +28,7 @@ def run(indata):
 	machine.run(print_code=False)
 	ans2 = machine.output[-1]
 	print("Part 2: {}".format(ans2))
-	clipboard.set("{}".format(ans2))
+	clipboard_set("{}".format(ans2))
 
 
 if __name__ == '__main__':
