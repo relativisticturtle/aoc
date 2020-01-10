@@ -2,8 +2,9 @@ import os
 import requests
 from datetime import datetime
 
+# Get session cookie with, e.g., chrome extension
 cookies = {
-		"session": "53616c7465645f5fccd9485a284ad61376ad129d04887b967bf50d5f045f61f5bb80809a64a61d3be2581621734a2e86"
+		"session": "53616c7465645f5ffa162416b46bd27d39696733057615740075f40710a0cad3c10822b7110841dc276d4b02f6896a70"
 	}
 
 def download_input(day=None, year=None, url=None):
