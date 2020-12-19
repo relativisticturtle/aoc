@@ -19,37 +19,30 @@ def run(indata):
     answer = int(D[b] * R[b])
     print("Part 1: {}".format(answer))
     clipboard_set("{}".format(answer))
-    return
+    
     # ----------- PART 2 -----------
     #
+    D = []
+    for d, l in enumerate(L[1].split(',')):
+        if l != 'x':
+            D.append((d, int(l)))
     
-    d = 0
-    wp = [1, 10]
-    p =[0, 0]
-    for l in L:
-        if l[0] == 'N':
-            wp[0] += int(l[1:])
-        elif l[0] == 'S':
-            wp[0] -= int(l[1:])
-        elif l[0] == 'E':
-            wp[1] += int(l[1:])
-        elif l[0] == 'W':
-            wp[1] -= int(l[1:])
-        elif l[0] == 'F':
-            p[0] += wp[0] * int(l[1:])
-            p[1] += wp[1] * int(l[1:])
-        elif l[0] == 'L':
-            for c in range(int(int(l[1:])/90)):
-                wp_y = wp[1]
-                wp[1] = -wp[0]
-                wp[0] = wp_y
-        elif l[0] == 'R':
-            for c in range(int(int(l[1:])/90)):
-                wp_y = wp[1]
-                wp[1] = wp[0]
-                wp[0] = -wp_y
+    for i in range(len(D)):
+        print('x = %2d (mod %3d)' % (-D[i][0] % D[i][1], D[i][1]))
     
-    answer = abs(p[0]) + abs(p[1])
+    N = D[0][1]
+    x = D[0][0]
+    for d in D[1:]:
+        for a in range(d[1]):
+            if (x + a * N) % d[1] == -d[0] % d[1]:
+                #print('(%d + %d * %d) %% %d == %d' % (x, a, N, d[1], -d[0] % d[1]))
+                x += a * N
+                N *= d[1]
+                break
+        #print(x)
+    
+    # 751731698158528 too low
+    answer = x
     print("Part 2: {}".format(answer))
     clipboard_set("{}".format(answer))
 
