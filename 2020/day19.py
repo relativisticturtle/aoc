@@ -43,31 +43,28 @@ def exp_rules(R):
 
 
 def match2rule(r, R, S):
-    print('{}: {}'.format(r, S))
+    #print('{}: {}'.format(r, S))
     M = []
     
     for x in R[r]:
         if isinstance(x, str):
             if S.startswith(x):
                 M.append(S[len(x):])
-                print(' ^R[{}]: {}|{}'.format(r, x,  S[len(x):]))
+                #print(' ^R[{}]: {}|{}'.format(r, x,  S[len(x):]))
             continue
-            
+        
+
         Q = deque()
         Q.append((0, S))
         while len(Q) > 0:
-            y, s = Q.popleft()
-            
-            for q in R[r][y]:
-                Z = match2rule(q, R, s)
-                print(' +R[{}]: *|{}'.format(q, Z))
-                if y+1 == len(R[r]):
-                    M.extend(Z)
-                    print(' _R[{}][{}]: *|{}'.format(r, y, Z))
-                    continue
-                for z in Z:
-                    Q.append((y+1, z))
-                    print(' -R[{}][{}]: *|{}'.format(r, y, z))
+            i, s = Q.popleft()
+            if i == len(x):
+                M.append(s)
+                continue
+            Z = match2rule(x[i], R, s)
+            for z in Z:
+                Q.append((i+1, z))
+                
     return M
 
 def run(indata):
@@ -92,23 +89,26 @@ def run(indata):
     count = 0
     for l in L[1]:
         M = match2rule(0, R, l)
-        print(l)
-        print(M)
         if '' in M:
             count += 1
-        break
     
     answer = count
     
     print("Part 1: {}".format(answer))
     clipboard_set("{}".format(answer))
-    return
     
     # ----------- PART 2 -----------
     #
     
-    # 273806840172142 too low
-    answer = sum([eval2X(X)[0] for X in L])
+    R[8] = [[42], [42, 8]]
+    R[11] = [[42, 31], [42, 11, 31]]
+    
+    count = 0
+    for l in L[1]:
+        M = match2rule(0, R, l)
+        if '' in M:
+            count += 1
+    answer = count
     
     print("Part 2: {}".format(answer))
     clipboard_set("{}".format(answer))

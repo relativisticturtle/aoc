@@ -40,12 +40,30 @@ def run(indata):
     
     print("Part 1: {}".format(answer))
     clipboard_set("{}".format(answer))
-    return
+    
     # ----------- PART 2 -----------
     #
     
-    # 273806840172142 too low
-    answer = sum([eval2X(X)[0] for X in L])
+    prevgame = set()
+
+    d1 = deque(L[0])
+    d2 = deque(L[1])
+
+    while len(d1) > 0 and len(d2) > 0:
+        c1 = d1.popleft()
+        c2 = d2.popleft()
+        
+        if c1 > c2:
+            d1.append(c1)
+            d1.append(c2)
+        elif c1 < c2:
+            d2.append(c2)
+            d2.append(c1)
+        else:
+            assert False
+
+    
+    answer = None
     
     print("Part 2: {}".format(answer))
     clipboard_set("{}".format(answer))
