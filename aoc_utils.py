@@ -2,10 +2,14 @@ import os
 import requests
 from datetime import datetime
 
-# Get session cookie with, e.g., chrome extension
+# Getting session-cookie using Chrome:
+# - Navigate to Advent of Code and login
+# - Right-click > "Inspect" > "Application"-tab
+# - "Storage" > "Session Storage" > "Cookies" > https://adventofcode.com
+# - ...and "Session"-key! Copy&paste here --v
 cookies = {
-		"session": "53616c7465645f5ff223afc8d3af23ddb55a7134a4fa386e4cd01980ed56b90eac226e4a59c3ba956080c724ee4eaa34"
-	}
+	"session": "53616c7465645f5fa6b9c6e6be138d55b4fc1f22418b3a9833c1405021c3767efa6e7f3e2850fcc6346818a62106a03b"
+}
 
 def download_input(day=None, year=None, url=None):
 	if not url:
