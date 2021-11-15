@@ -9,7 +9,7 @@ import IntCode
 class NodeFunction:
     def __init__(self, fname, parameters, block):
         self.fname = fname
-        self.parameters = [NodeVariable(p[0], p[1]) for p in parameters]
+        self.parameters = parameters
         self.block = block
 
         # Local variables from function body
@@ -18,10 +18,10 @@ class NodeFunction:
         # Parameters (treated like local variables)
         rbo = -self.stack_size
         for param in self.parameters:
-            param.rbo = rbo
+            param.address = rbo
             rbo += 1
     
-    def emit(self):
+    def emit(self, global_variables):
         precode = []
         
         # Allocate memory on stack for return address, parameters and local variables
@@ -29,13 +29,9 @@ class NodeFunction:
         rbo_step = 2 + self.stack_size
         precode.append(['<FCN_%s>' % self.fname, 'ARB', rbo_step])
         precode.append(['<RB_new=RB_old+%d>' % rbo_step, 'ADD', 'RB[%d]' % -rbo_step, rbo_step, 'RB[0]'])
-        ## Adjust references to new relative base
-        #for p in self.parameters:
-        #    if p.is_reference:
-        #        precode.append(['<*%s>' % p.name, 'ADD', 'RB[%d]' % p.rbo, -(1 + self.stack_size), 'RB[%d]' % p.rbo])
-
+        
         # Emit code body
-        precode.extend(self.block.emit(self.parameters, return_location='</FCN_%s>' % self.fname))
+        precode.extend(self.block.emit(global_variables + self.parameters, return_location='</FCN_%s>' % self.fname))
         # Restore stack (parameters and return address are also consumed)
         precode.append(['</FCN_%s>' % self.fname, 'ARB', -rbo_step])
         # Jump to designated return location
@@ -52,7 +48,7 @@ class NodeScope:
     def setup_variables_on_stack(self, stack_size):
         for variable in self.local_variables:
             stack_size += 1 + int(variable.array_size) if variable.array_size else 1
-            variable.rbo = -stack_size
+            variable.address = -stack_size
         max_stack_size = stack_size
         for subscope in self.subscopes:
             max_stack_size = max(max_stack_size, subscope.setup_variables_on_stack(stack_size))
@@ -63,7 +59,56 @@ class NodeScope:
         precode = []
         for v in self.local_variables:
             if v.array_size and v.array_size > 0:
-                precode.append(['<int %s[]>' % v.name, 'ADD', 0, v.rbo + 1, 'RB[%d]' % v.rbo])
+                precode.append(['<int %s[]>' % v.name, 'ADD', 0, v.address + 1, 'RB[%d]' % v.address])
+        return precode
+
+
+class NodeProgram:
+    def __init__(self, functions, global_variables):
+        self.global_variables = global_variables
+        self.functions = functions
+
+        for v in self.global_variables:
+            v.address = '<global_%s>' % v.name
+
+
+    def emit(self):
+        # --- HEADER ---
+        precode = []
+        precode.append(['<CODE>', 'ARB', '<STACK/>'])
+        precode.append(['<RB=...>', 'ADD', 0, '<STACK/>', 'RB[0]'])
+
+        # Call main
+        node_call = NodeCall('main', [])
+        precode.extend(node_call.emit([]))
+
+        # Stop
+        precode.append(['<STOP>', 'STOP'])
+        
+        # --- CODE ---
+        for node_fcn in functions:
+            precode.extend(node_fcn.emit(self.global_variables))
+
+        # --- STOP ---
+        precode.append(['</CODE>', 'STOP'])
+
+        # --- DATA SECTION ---
+        
+        # Setup all global variables
+        for v in self.global_variables:
+            # v.address = '<global_%s>' % v.name
+            if v.array_size and v.array_size > 0:
+                precode.append(['<global_%s>' % v.name, '<global_%s> + 1' % v.name])
+                if v.array_init is not None and len(v.array_init) <= v.array_size:
+                    precode.append(['<  [%d]>' % v.array_size, *(v.array_init + [0] * (v.array_size - len(v.array_init)))])
+                elif v.array_init is None:
+                    precode.append(['<  [%d]>' % v.array_size, *([0] * v.array_size)])
+                else:
+                    raise SyntaxError('Array cannot hold all that')
+            else:
+                precode.append(['<global_%s>' % v.name, 0])
+        
+        precode.append(['<STACK/>', 0])
         return precode
 
 
@@ -120,6 +165,7 @@ class NodeGoto:
     
     def emit(self, local_variables, **kwargs):
         return [['<GOTO>', 'JZ', 0, kwargs[self.location]]]
+
 
 class NodeFor(NodeScope):
     _num = 0
@@ -182,10 +228,12 @@ class NodeAssignment:
 
 
 class NodeVariable:
-    def __init__(self, name, array_size=None):
+    def __init__(self, name, array_size=None, is_global=False, array_init=None):
         self.name = name
-        self.rbo = None
+        self.address = None
         self.array_size = array_size
+        self.array_init = array_init
+        self.is_global = is_global
 
 
 class NodeCall:
@@ -352,15 +400,19 @@ class NodeExpression:
                 precode.append(['<%s/>' % item, 'ADD', 0, int(item), 'RB[%d]' % rbo])
                 rbo += 1
             else:
-                source_address = None
                 for v in local_variables[::-1]:
                     if v.name == item:
-                        source_address = 'RB[%d]' % v.rbo
                         break
                 else:
                     raise RuntimeError('Variable \'%s\' seems undefined' % item)
-                precode.append([None, 'ADD', 'RB[0]', v.rbo, 'RB[%d]' % rbo])
-                rbo += 1
+                
+                if v.is_global:
+                    precode.append([None, 'ADD', 0, v.address, 'RB[%d]' % rbo])
+                    #precode.append([None, 'ADD', 'RB[0]', v.address, 'RB[%d]' % rbo])
+                    rbo += 1
+                else:
+                    precode.append([None, 'ADD', 'RB[0]', v.address, 'RB[%d]' % rbo])
+                    rbo += 1
         return precode
 
 
@@ -371,21 +423,18 @@ def is_valid_name(name):
         return False
     return True
 
+
 def is_empty_or_comment(text):
     return text.strip() == '' or text.lstrip().startswith('//')
+
 
 def strip_ws_and_comments(text):
     comment = text.find('//')
     return text[:comment].strip() if comment >= 0 else text.strip()
 
+
 def get_variable(text):
-    # Pointer type?
     text = text.strip()
-    if text[0] == '*':
-        pointer_type = True
-        text = text[1:].strip()
-    else:
-        pointer_type = False
 
     # Array type?
     left_bracket = text.rfind('[')
@@ -405,30 +454,48 @@ def get_variable(text):
     if not is_valid_name(vname):
         raise SyntaxError('Invalid variable-name \'%s\'' % vname)
     
-    return vname, pointer_type, array_type, bracket_expression
+    return vname, array_type, bracket_expression
 
-def get_variable_definition(text):
+
+def read_variable_definition(code, row, is_global=False):
     # -------------------------------------------
     # Parse a variable definition
     #
     # primitive:  int a
     #     array:  int b[10]
     # -------------------------------------------
-    if not text.lstrip().startswith('int'):
-        raise SyntaxError('Only int-types allowed. (not \'%s\')' % text.split('*')[0].split(' ')[0])
+    
 
-    vname, pointer_type, array_type, bracket_expression = get_variable(text.lstrip()[3:])
+    semicolon = code[row].find(';')
+    if semicolon < 0 or not is_empty_or_comment(code[row][(semicolon + 1):]):
+        raise SyntaxError('Invalid variable-definition', ('', row + 1, 0, code[row]))
+    line = code[row][:semicolon].strip()
+    if not line.startswith('int') or len(line) < 4  or line[4].isspace():
+        raise SyntaxError('Only int-types allowed. (not \'%s\')' % line.split(' ')[0])
+    vname, array_type, bracket_expression = get_variable(line[3:])
 
     if array_type:
         if not bracket_expression.isnumeric():
-            raise SyntaxError('Invalid array-size (expected int-constant): \'%s\'' % bracket_expression)
+            raise SyntaxError('Invalid array-size (expected int-constant): \'%s\'' % bracket_expression, ('', row + 1, 0, code[row]))
         array_size = int(bracket_expression)
         if array_size <= 0:
-            raise SyntaxError('Array-size must be positive, not \'%d\'' % array_size)
+            raise SyntaxError('Array-size must be positive, not \'%d\'' % array_size, ('', row + 1, 0, code[row]))
+        
+        right_bracket = code[row].find(']')
+        equals = code[row].find('=')
+        left_curly = code[row].find('{')
+        right_curly = code[row].find('}')
+
+        if right_bracket < equals and equals < left_curly and left_curly < right_curly and right_curly < semicolon:
+            array_init = [int(x) for x in code[row][(left_curly + 1):right_curly].split(',')]
+        elif equals < 0 and left_curly < 0 and right_curly < 0:
+            array_init = None
+        else:
+            raise SyntaxError('Illegal array-initialization', ('', row + 1, 0, code[row]))
+        print(array_init)
+        return NodeVariable(vname, array_size, is_global, array_init), row + 1
     else:
-        array_size = 0
-    
-    return vname, pointer_type, array_type, array_size
+        return NodeVariable(vname, None, is_global, None), row + 1
 
 
 def read_forloop(code, row):
@@ -471,7 +538,7 @@ def read_forloop(code, row):
             expression = NodeExpression(assignment_text[(assignment_text.find('=') + 1):].strip())
             statements.append(NodeAssignment(target, expression))
     
-    block, row = read_block(code, row+1)
+    block, row = read_block(code, row + 1)
     
     return NodeFor(condition, block, statements[0], statements[1]), row
 
@@ -514,11 +581,11 @@ def read_ifelse(code, row):
             raise SyntaxError('Unexpected \'%s\' in if-else-statement' % should_be_empty_1, ('', row + 1, 0, code[row]))
         if not is_empty_or_comment(should_be_empty_2):
             raise SyntaxError('Unexpected \'%s\' in if-else-statement' % should_be_empty_2, ('', row + 1, 0, code[row]))
-        else_block, row = read_block(code, row+1)
+        else_block, row = read_block(code, row + 1)
     else:
         else_block = None
     return NodeIfElse(condition, if_block, else_block), row
-    #return NodeFunction(fname, params, block), row
+
 
 def read_block(code, row):
     # -------------------------------------------
@@ -539,23 +606,8 @@ def read_block(code, row):
         if is_empty_or_comment(line):
             row += 1
         elif line.startswith('int') and line[3].isspace():
-            semicolon = line.find(';')
-            if semicolon < 0 or not is_empty_or_comment(line[(semicolon + 1):]):
-                raise SyntaxError('Invalid variable-definition', ('', row + 1, 0, code[row]))
-            try:
-                variable_definition = get_variable_definition(line[:semicolon])
-            except SyntaxError as e:
-                raise SyntaxError(e.msg, ('', row + 1, 0, code[row]))
-            
-            if variable_definition[1] and not variable_definition[2]:
-                raise NotImplementedError('Pointer type')
-            elif not variable_definition[1] and variable_definition[2]:
-                local_variables.append(NodeVariable(variable_definition[0], int(variable_definition[3])))
-            elif variable_definition[1] and variable_definition[2]:
-                raise NotImplementedError('Pointer-Array type')
-            else:
-                local_variables.append(NodeVariable(variable_definition[0]))
-            row += 1
+            variable, row = read_variable_definition(code, row)
+            local_variables.append(variable)
         elif line.startswith('if') and line[2:].lstrip().startswith('('):
             ifelse, row = read_ifelse(code, row)
             statements.append(ifelse)
@@ -575,7 +627,7 @@ def read_block(code, row):
             #print('  %s' % ', '.join([variable[0] for variable in local_variables]))
             row += 1
             break
-        elif line.find('(') > 0:
+        elif 0 < line.find('(') and (line.find('=') == -1 or line.find('(') < line.find('=')):
             left_paren = line.find('(')
             right_paren = line.rfind(')')
             semicolon = line.find(';')
@@ -588,7 +640,7 @@ def read_block(code, row):
             args = [a.strip() for a in line[(left_paren + 1):right_paren].split(',')]
             statements.append(NodeCall(fname, [NodeExpression(a) for a in args]))
             row += 1
-        elif line.find('=') > 0:
+        elif 0 < line.find('='):
             semicolon = line.find(';')
             if semicolon < 0 or not is_empty_or_comment(line[(semicolon + 1):]):
                 raise SyntaxError('Assignment not (properly) terminated with \';\'', ('', row + 1, 0, code[row]))
@@ -604,6 +656,7 @@ def read_block(code, row):
     
     return NodeBlock(statements, local_variables), row
 
+
 def read_function(code, row):
     # -------------------------------------------
     # Read function
@@ -612,17 +665,19 @@ def read_function(code, row):
     #            ...
     #         }
     # -------------------------------------------
+
+    # Verify function structure
     left_paren = code[row].find('(')
     right_paren = code[row].rfind(')')
     left_curly = code[row].rfind('{')
     if not (code[row].startswith('void ') and 0 < left_paren and left_paren < right_paren and right_paren < left_curly):
         raise SyntaxError('Expected \'void <function-name>(...) {\'', ('', row + 1, 0, code[row]))
     
+    # Read function name and definition
     fname = code[row][5:left_paren].strip()
     param_list = code[row][(left_paren+1):right_paren]
     should_be_empty_1 = code[row][(right_paren+1):left_curly].strip()
     should_be_empty_2 = code[row][(left_curly+1):].strip()
-
     if not is_valid_name(fname):
         raise SyntaxError('Invalid function-name \'%s\'' % fname, ('', row + 1, 0, code[row]))
     if not (should_be_empty_1 == ''):
@@ -630,20 +685,18 @@ def read_function(code, row):
     if not is_empty_or_comment(should_be_empty_2):
         raise SyntaxError('Unexpected \'%s\' in function definition' % should_be_empty_2, ('', row + 1, 0, code[row]))
 
+    # Read parameters
     param_defs = [param_def.strip() for param_def in param_list.split(',')]
     if param_defs[0] == '':
         param_defs.pop(0)
-    try:
-        params = [get_variable_definition(param_def) for param_def in param_defs]
-    except SyntaxError as e:
-        raise SyntaxError(e.msg, ('', row + 1, 0, code[row]))
+    if not all([param_def.startswith('int') and param_def[3].isspace() for param_def in param_defs]):
+        raise SyntaxError('Only int-type is allowed for parameters', ('', row + 1, 0, code[row]))
+    variables = [get_variable(param_def[3:]) for param_def in param_defs]
+    if any([v[1] for v in variables]):
+        raise SyntaxError('No array-types are allowed for parameters', ('', row + 1, 0, code[row]))
+    params = [NodeVariable(v[0]) for v in variables]
     
-
-    #print('void %s(%s)' % (fname, ', '.join([param[0] for param in params])))
-    # -------------------------------------------
-    # Process function body
-    # -------------------------------------------
-
+    # Read function body
     block, row = read_block(code, row + 1)
     
     return NodeFunction(fname, params, block), row
@@ -651,23 +704,30 @@ def read_function(code, row):
 
 def read_file(input_file):
     functions = []
+    global_variables = []
 
     with open(input_file) as f:
         code = f.read().splitlines(keepends=False)
     
-    row = 0
-    while row < len(code):
-        if is_empty_or_comment(code[row]):
-            row += 1
-            continue
-        try:
-            node_fcn, row = read_function(code, row)
-            functions.append(node_fcn)
-        except SyntaxError as e:
-            print('\nERROR: %s, in %s:' % (e.msg, input_file))
-            print('\n%5d: %s' % (e.lineno, e.text))
-            sys.exit(1)
-    return functions
+    try:
+        row = 0
+        while row < len(code):
+            # Strip comments once and for all on this line
+            line = strip_ws_and_comments(code[row])
+
+            if is_empty_or_comment(line):
+                row += 1
+            elif line.startswith('int') and line[3].isspace():
+                variable, row = read_variable_definition(code, row, is_global=True)
+                global_variables.append(variable)
+            elif line.startswith('void') and line[4].isspace():
+                node_fcn, row = read_function(code, row)
+                functions.append(node_fcn)
+    except SyntaxError as e:
+        print('\nERROR: %s, in %s:' % (e.msg, input_file))
+        print('\n%5d: %s' % (e.lineno, e.text))
+        sys.exit(1)
+    return functions, global_variables
 
 
 def assemble_precode_to_intcode(precode):
@@ -694,6 +754,10 @@ def assemble_precode_to_intcode(precode):
             label_lookup[line[0]] = len(intcode)
             labels[len(intcode)] = line[0]
         
+        if line[1] not in opcodes:
+            intcode.extend(line[1:])
+            continue
+
         # Parameter modes
         assert line[1] in opcodes, 'Invalid op: %s' % line[1]
         intcode.append(opcodes[line[1]])
@@ -735,9 +799,9 @@ def assemble_precode_to_intcode(precode):
     return intcode, labels
 
 
-
 if __name__ == '__main__':
-    #sys.argv = ['intcode_cc.py', '-i', 'hello_world.c']
+    # > python intcode_cc.py -i divmod.c -o aout.txt && python intcode_vm.py aout.txt
+    #sys.argv = ['intcode_cc.py', '-i', 'divmod.c']
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, nargs='+', required=True)
@@ -746,29 +810,14 @@ if __name__ == '__main__':
 
     # Read code
     functions = []
+    global_variables = []
     for input_file in args.input:
-        functions.extend(read_file(input_file))
-
-    # --- HEADER ---
-    precode = []
-
-    # Setup stack
-    precode.append(['<CODE>', 'ARB', '</CODE>'])
-    precode.append(['<RB=...>', 'ADD', 0, '</CODE>', 'RB[0]'])
-
-    # Call main
-    node_call = NodeCall('main', [])
-    precode.extend(node_call.emit([]))
-
-    # Stop
-    precode.append(['<STOP>', 'STOP'])
+        _functions, _global_variables = read_file(input_file)
+        functions.extend(_functions)
+        global_variables.extend(_global_variables)
     
-    # --- CODE ---
-    for node_fcn in functions:
-        precode.extend(node_fcn.emit())
-
-    # --- STOP ---
-    precode.append(['</CODE>', 'STOP'])
+    program = NodeProgram(functions, global_variables)
+    precode = program.emit()
 
     # Print what we got
     for line in precode:

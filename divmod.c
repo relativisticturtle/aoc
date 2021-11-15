@@ -1,3 +1,6 @@
+//
+int two_xp[32] = {1, 2, 4, 8, 16, 32, 64, 128, 256};
+
 // C Lite
 void divmod(int res, int a, int b) {
     int p;
@@ -25,6 +28,8 @@ void main() {
     int a;
     int b;
     int res[2];
+    two_xp[9] = 512;
+    print(two_xp[9]);
 
     scan(&a);
     scan(&b);
