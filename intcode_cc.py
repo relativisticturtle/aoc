@@ -464,7 +464,6 @@ def read_variable_definition(code, row, is_global=False):
     # primitive:  int a
     #     array:  int b[10]
     # -------------------------------------------
-    
 
     semicolon = code[row].find(';')
     if semicolon < 0 or not is_empty_or_comment(code[row][(semicolon + 1):]):
@@ -492,7 +491,6 @@ def read_variable_definition(code, row, is_global=False):
             array_init = None
         else:
             raise SyntaxError('Illegal array-initialization', ('', row + 1, 0, code[row]))
-        print(array_init)
         return NodeVariable(vname, array_size, is_global, array_init), row + 1
     else:
         return NodeVariable(vname, None, is_global, None), row + 1
@@ -799,9 +797,50 @@ def assemble_precode_to_intcode(precode):
     return intcode, labels
 
 
+def functions_to_link(functions, global_variables):
+    fcn_dict = dict()
+    for f in functions:
+        assert f.fname not in fcn_dict, 'Duplicate function: %s' % f.fname
+        fcn_dict[f.fname] = f
+    
+    glb_dict = dict()
+    for g in global_variables:
+        assert g.name not in glb_dict, 'Duplicate global variable: %s' % g.name
+        glb_dict[g.name] = g
+
+    assert 'main' in fcn_dict, 'Missing main-function'
+
+    fcn_to_link = set()
+    glb_to_link = set()
+    bfsQ = deque()
+    bfsQ.append(fcn_dict['main'])
+    while len(bfsQ) > 0:
+        node = bfsQ.popleft()
+        if isinstance(node, NodeFunction):
+            fcn_to_link.add(node.fname)
+            bfsQ.append(node.block)
+        elif isinstance(node, NodeCall):
+            if node.fname in fcn_dict:
+                bfsQ.append(fcn_dict[node.fname])
+            bfsQ.extend(node.parameters)
+        elif isinstance(node, NodeBlock):
+            bfsQ.extend(node.statements)
+        elif isinstance(node, NodeIfElse):
+            bfsQ.extend([node.condition, node.iftrue, node.iffalse])
+        elif isinstance(node, NodeFor):
+            bfsQ.extend([node.statement_1st, node.condition, node.statement_every, node.block])
+        elif isinstance(node, NodeAssignment):
+            bfsQ.extend([node.target, node.expression])
+        elif isinstance(node, NodeExpression):
+            for item in node.postfix:
+                if item in glb_dict:
+                    glb_to_link.add(item)
+    return fcn_to_link, glb_to_link
+
+
 if __name__ == '__main__':
-    # > python intcode_cc.py -i divmod.c -o aout.txt && python intcode_vm.py aout.txt
-    #sys.argv = ['intcode_cc.py', '-i', 'divmod.c']
+    # > python intcode_cc.py -i math.c memory.c hello_world.c -o aout.txt && python intcode_vm.py aout.txt
+    #sys.argv = ['intcode_cc.py', '-i', 'math.c', 'memory.c', 'hello_world.c']
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, nargs='+', required=True)
@@ -816,17 +855,31 @@ if __name__ == '__main__':
         functions.extend(_functions)
         global_variables.extend(_global_variables)
     
+    # Prune unnecessary code and global variables
+    fcn_to_link, glb_to_link = functions_to_link(functions, global_variables)
+    if False:
+        print('--- FUNCTIONS ---')
+        for f in fcn_to_link:
+            print('  void %s()' % f)
+        print('--- GLOBAL VARIABLES ---')
+        for g in glb_to_link:
+            print('  int %s' % g)
+    functions = [f for f in functions if f.fname in fcn_to_link]
+    global_variables = [g for g in global_variables if g.name in glb_to_link]
+
+    # Compile!
     program = NodeProgram(functions, global_variables)
     precode = program.emit()
 
-    # Print what we got
-    for line in precode:
-        if line[0] is not None:
-            print(('%30s : ' % line[0]) + str(line[1:]))
-        else:
-            print(('%30s : ' % '') + str(line[1:]))
+    if False:
+        # Print what we got
+        for line in precode:
+            if line[0] is not None:
+                print(('%30s : ' % line[0]) + str(line[1:]))
+            else:
+                print(('%30s : ' % '') + str(line[1:]))
 
-    # --- LINK(?) ---
+    # Link!
     intcode, labels = assemble_precode_to_intcode(precode)
     #for l, n in enumerate(intcode):
     #    print('%5d : %s' % (l, n))
