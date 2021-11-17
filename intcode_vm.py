@@ -3,6 +3,7 @@ import argparse
 import IntCode
 
 if __name__ == '__main__':
+    #sys.argv = ['intcode_vm.py', 'aout.txt']
     parser = argparse.ArgumentParser()
     parser.add_argument("intcode", type=str, default='aout.txt')
     args = parser.parse_args()

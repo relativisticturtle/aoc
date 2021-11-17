@@ -291,7 +291,7 @@ class NodeExpression:
         while i < len(text):
             if text[i].isspace():
                 i += 1
-            elif text[i].isalnum():
+            elif text[i].isalnum() or text[i] == '_':
                 j = 1
                 while i+j < len(text) and (text[i+j].isalnum() or text[i+j] == '_'):
                     j += 1
