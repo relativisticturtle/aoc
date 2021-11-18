@@ -817,8 +817,9 @@ def functions_to_link(functions, global_variables):
     while len(bfsQ) > 0:
         node = bfsQ.popleft()
         if isinstance(node, NodeFunction):
-            fcn_to_link.add(node.fname)
-            bfsQ.append(node.block)
+            if node.fname not in fcn_to_link:
+                fcn_to_link.add(node.fname)
+                bfsQ.append(node.block)
         elif isinstance(node, NodeCall):
             if node.fname in fcn_dict:
                 bfsQ.append(fcn_dict[node.fname])
