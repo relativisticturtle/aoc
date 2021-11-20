@@ -1,5 +1,5 @@
 // "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64"
-// cl /EHsc intcode_vm.cpp
+// cl /EHsc /O2 intcode_vm.cpp
 
 #include <cstdlib>
 #include <cstdint>
@@ -58,7 +58,7 @@ void assign(int64_t val, int64_t p, int mode, int64_t rb) {
 }
 
 
-int64_t run() {
+int64_t run(int io_format) {
     int64_t n = 0;
     int64_t i = 0;
     int64_t rb = 0;
@@ -88,12 +88,21 @@ int64_t run() {
             break;
         case 3:
             int64_t x;
-            std::cin >> x;
-            assign(x, code[i+1], C, rb);
+            if(io_format == 0)
+                std::cin >> x;
+            else
+                x = std::cin.get();
+            if(!std::cin.eof() && std::cin.good())
+                assign(x, code[i+1], C, rb);
+            else
+                assign(-999999, code[i+1], C, rb);
             i += 2;
             break;
         case 4:
-            std::cout << eval(code[i+1], C, rb) << std::endl;
+            if(io_format == 0)
+                std::cout << eval(code[i+1], C, rb) << std::endl;
+            else
+                std::cout.put(eval(code[i+1], C, rb));
             i += 2;
             break;
         case 5:
@@ -134,25 +143,52 @@ int64_t run() {
 
 
 int main(int argc, const char* argv[]) {
-    if(argc < 2) {
-        std::cout << "Usage: " << argv[0] << " intcode_file.txt" << std::endl;
+    //
+    // Parse arguments
+    //
+    int io_format = 0;
+    int code_p = 0;
+    int verbose = 0;
+    for(int j=1; j<argc; j++) {
+        if(strcmp(argv[j], "-r") == 0)
+            io_format = 1;
+        else if(strcmp(argv[j], "-v") == 0)
+            verbose = 1;
+        else if(code_p == 0)
+            code_p = j;
+        else {
+            std::cout << "Usage: " << argv[0] << " [-r] intcode_file.txt" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+    }
+    if(code_p == 0) {
+        std::cout << "Usage: " << argv[0] << " [-r] intcode_file.txt" << std::endl;
         exit(EXIT_FAILURE);
     }
 
+    //
+    // Read data file
+    //
     std::memset(code, 0, sizeof code);
-    std::ifstream infile(argv[1]);
+    std::ifstream infile(argv[code_p]);
     int i;
-    for(i=0; i<MAX_SIZE && !infile.eof();) {
+    for(i=0; i<MAX_SIZE && !infile.eof() && infile.good();) {
         infile >> code[i++];
         if (infile.peek() == ',')
             infile.ignore();
     }
-    std::cout << i << " integers read" << std::endl;
+    if(verbose) {
+        std::cout << i << " integers read" << std::endl;
+        std::cout << "-------------------------" << std::endl;
+    }
 
-    //code[1] = 76;
-    //code[2] = 21;
+    //
+    // Run!
+    //
+    int64_t n = run(io_format);
 
-    int64_t n = run();
-    std::cout << "done! " << n << " instructions executed." << std::endl;
-    //std::cout << code[0] << std::endl;
+    if(verbose) {
+        std::cout << "-------------------------" << std::endl;
+        std::cout << "done! " << n << " instructions executed." << std::endl;
+    }
 }

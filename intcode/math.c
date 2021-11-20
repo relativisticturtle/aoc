@@ -12,10 +12,10 @@ int _xp2[32] = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 1
 void divmod(int res, int a, int b) {
     res[0] = 0;
     int p;
-    for(p=31; p>=0; p=p-1) {
+    for(p=31; p>=0; p-=1) {
         if(b*_xp2[p] <= a) {
-            res[0] = res[0] + _xp2[p];
-            a = a - b*_xp2[p];
+            res[0] += _xp2[p];
+            a -= b*_xp2[p];
         }
     }
     res[1] = a;

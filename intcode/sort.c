@@ -4,18 +4,17 @@ void merge_into(int source, int target, int pivot, int size) {
     int c;
     a = 0;
     b = pivot;
-    for(c=0; c<size; c=c+1) {
+    for(c=0; c<size; c+=1) {
         if( (b >= size) + (source[a] <= source[b]) * (a < pivot) ) {
             target[c] = source[a];
-            a = a + 1;
+            a += 1;
         }
         else {
             target[c] = source[b];
-            b = b + 1;
+            b += 1;
         }
     }
 }
-
 
 void sort_into(int source, int target, int size) {
     int pivot;

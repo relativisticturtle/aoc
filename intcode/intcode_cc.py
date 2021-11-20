@@ -457,6 +457,40 @@ def get_variable(text):
     return vname, array_type, bracket_expression
 
 
+def parse_statement(text, code, row):
+    text = text.strip()
+    if text == 'break':
+        return NodeGoto('break_location')
+    elif text == 'return':
+        return NodeGoto('return_location')
+    elif 0 < text.find('(') and (text.find('=') == -1 or text.find('(') < text.find('=')):
+        left_paren = text.find('(')
+        right_paren = text.rfind(')')
+        if not (0 < left_paren and left_paren < right_paren):
+            raise SyntaxError('Parenthesis \'()\' mis-match', ('', row + 1, 0, code[row]))
+        if not (is_valid_name(text[:left_paren]) and is_empty_or_comment(text[(right_paren + 1):])):
+            raise SyntaxError('Failed to parse function', ('', row + 1, 0, code[row]))
+        fname = text[:left_paren]
+        args = [a.strip() for a in text[(left_paren + 1):right_paren].split(',')]
+        return NodeCall(fname, [NodeExpression(a) for a in args])
+    elif 0 < text.find('+='):
+        target = NodeExpression(text[:text.find('+=')].strip())
+        expression = NodeExpression(target.text + '+(' + text[(text.find('+=') + 2):].strip() + ')')
+        return NodeAssignment(target, expression)
+    elif 0 < text.find('-='):
+        target = NodeExpression(text[:text.find('-=')].strip())
+        expression = NodeExpression(target.text + '-(' + text[(text.find('-=') + 2):].strip() + ')')
+        return NodeAssignment(target, expression)
+    elif 0 < text.find('*='):
+        target = NodeExpression(text[:text.find('*=')].strip())
+        expression = NodeExpression(target.text + '*(' + text[(text.find('*=') + 2):].strip() + ')')
+        return NodeAssignment(target, expression)
+    elif 0 < text.find('='):
+        target = NodeExpression(text[:text.find('=')].strip())
+        expression = NodeExpression(text[(text.find('=') + 1):].strip())
+        return NodeAssignment(target, expression)
+
+
 def read_variable_definition(code, row, is_global=False):
     # -------------------------------------------
     # Parse a variable definition
@@ -484,8 +518,12 @@ def read_variable_definition(code, row, is_global=False):
         equals = code[row].find('=')
         left_curly = code[row].find('{')
         right_curly = code[row].find('}')
+        left_cite = code[row].find('"')
+        right_cite = code[row].rfind('"')
 
-        if right_bracket < equals and equals < left_curly and left_curly < right_curly and right_curly < semicolon:
+        if right_bracket < equals and equals < left_cite and left_cite < right_cite and right_cite < semicolon:
+            array_init = [ord(x) for x in code[row][(left_cite + 1):right_cite]] + [0]
+        elif right_bracket < equals and equals < left_curly and left_curly < right_curly and right_curly < semicolon:
             array_init = [int(x) for x in code[row][(left_curly + 1):right_curly].split(',')]
         elif equals < 0 and left_curly < 0 and right_curly < 0:
             array_init = None
@@ -514,9 +552,9 @@ def read_forloop(code, row):
     if not (forloop_line.startswith('for') and 0 < left_paren and left_paren < semicolon1 and semicolon1 < semicolon2 and semicolon2 < right_paren and right_paren < left_curly):
         raise SyntaxError('Expected \'for (...; ...; ...) {\'', ('', row + 1, 0, code[row]))
     
-    assignment1_text = forloop_line[(left_paren+1):semicolon1].strip()
+    statement1_text = forloop_line[(left_paren+1):semicolon1].strip()
     condition = NodeExpression(forloop_line[(semicolon1+1):semicolon2])
-    assignment2_text = forloop_line[(semicolon2+1):right_paren].strip()
+    statement2_text = forloop_line[(semicolon2+1):right_paren].strip()
     should_be_empty_1 = forloop_line[(right_paren+1):left_curly].strip()
     should_be_empty_2 = forloop_line[(left_curly+1):].strip()
 
@@ -526,15 +564,11 @@ def read_forloop(code, row):
         raise SyntaxError('Unexpected \'%s\' in if-else-statement' % should_be_empty_2, ('', row + 1, 0, code[row]))
     
     statements = []
-    for assignment_text in [assignment1_text, assignment2_text]:
-        if assignment_text == '':
+    for statement_text in [statement1_text, statement2_text]:
+        if statement_text == '':
             statements.append(None)
-        elif assignment_text.find('=') < 0:
-            raise SyntaxError('Expected assignment, not \'%s\'' % assignment_text, ('', row + 1, 0, code[row]))
         else:
-            target = NodeExpression(assignment_text[:assignment_text.find('=')].strip())
-            expression = NodeExpression(assignment_text[(assignment_text.find('=') + 1):].strip())
-            statements.append(NodeAssignment(target, expression))
+            statements.append(parse_statement(statement_text, code, row))
     
     block, row = read_block(code, row + 1)
     
@@ -615,37 +649,11 @@ def read_block(code, row):
         elif line.startswith('while') and line[5:].lstrip().startswith('('):
             warnings.warn('NYI')
             row = read_block(code, row+1)
-        elif line.startswith('break;'):
-            statements.append(NodeGoto('break_location'))
-            row += 1
-        elif line.startswith('return;'):
-            statements.append(NodeGoto('return_location'))
-            row += 1
         elif line == '}':
-            #print('  %s' % ', '.join([variable[0] for variable in local_variables]))
             row += 1
             break
-        elif 0 < line.find('(') and (line.find('=') == -1 or line.find('(') < line.find('=')):
-            left_paren = line.find('(')
-            right_paren = line.rfind(')')
-            semicolon = line.find(';')
-            if not (0 < left_paren and left_paren < right_paren and right_paren < semicolon):
-                raise SyntaxError('Parenthesis \'()\' mis-match or missing \';\'', ('', row + 1, 0, code[row]))
-            if not (is_valid_name(line[:left_paren]) and is_empty_or_comment(line[(right_paren + 1):semicolon]) and is_empty_or_comment(line[(semicolon + 1):])):
-                raise SyntaxError('Failed to parse function', ('', row + 1, 0, code[row]))
-            
-            fname = line[:left_paren]
-            args = [a.strip() for a in line[(left_paren + 1):right_paren].split(',')]
-            statements.append(NodeCall(fname, [NodeExpression(a) for a in args]))
-            row += 1
-        elif 0 < line.find('='):
-            semicolon = line.find(';')
-            if semicolon < 0 or not is_empty_or_comment(line[(semicolon + 1):]):
-                raise SyntaxError('Assignment not (properly) terminated with \';\'', ('', row + 1, 0, code[row]))
-            
-            target = NodeExpression(line[:line.find('=')].strip())
-            expression = NodeExpression(line[(line.find('=') + 1):semicolon].strip())
-            statements.append(NodeAssignment(target, expression))
+        elif line.endswith(';'):
+            statements.append(parse_statement(line[:-1], code, row))
             row += 1
         else:
             raise SyntaxError('Invalid expression', ('', row + 1, 0, code[row]))
@@ -841,7 +849,9 @@ def functions_to_link(functions, global_variables):
 
 if __name__ == '__main__':
     # > python intcode_cc.py -i math.c memory.c hello_world.c -o aout.txt && python intcode_vm.py aout.txt
-    #sys.argv = ['intcode_cc.py', '-i', 'math.c', 'memory.c', 'hello_world.c']
+    # sys.argv = ['intcode_cc.py', '-i', 'math.c', 'memory.c', '../2021/y2019_day01.c', '-o', 'aout.txt']
+    sys.argv = ['intcode_cc.py', '-i', 'test.c', '-o', 'aout.txt']
+    #python ../intcode/intcode_cc.py -i math.c memory.c ../2021/y2019_day01.c -o aout.txt
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, nargs='+', required=True)

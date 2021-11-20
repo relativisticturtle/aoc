@@ -12,5 +12,13 @@ venv/
 # PyCharm
 .idea/
 
+# VS Code
+.vscode/
+
+
 # AoC input files
 input*.txt
+
+# Binaries
+*.exe
+*.obj
