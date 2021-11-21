@@ -59,7 +59,7 @@ class NodeScope:
         precode = []
         for v in self.local_variables:
             if v.array_size and v.array_size > 0:
-                precode.append(['<int %s[]>' % v.name, 'ADD', 0, v.address + 1, 'RB[%d]' % v.address])
+                precode.append(['<int %s[]>' % v.name, 'ADD', 'RB[0]', v.address + 1, 'RB[%d]' % v.address])
         return precode
 
 
@@ -189,19 +189,21 @@ class NodeFor(NodeScope):
         # Check condition
         precode.append(['<%s>' % self.tag, 'ARB', 0])
         precode.extend(self.condition.emit(local_variables, 1))
-        precode.append([None, 'JZ', 'RB[1]', '</%s>' % self.tag])
+        precode.append([None, 'JZ', 'RB[1]', '<//%s>' % self.tag])
         
         # Block
-        kwargs['break_location'] ='</%s>' % self.tag
+        kwargs['break_location'] ='<//%s>' % self.tag
+        kwargs['continue_location'] ='</%s>' % self.tag
         precode.extend(self.block.emit(local_variables, **kwargs))
 
         # Post-iteration statement
+        precode.append(['</%s>' % self.tag, 'ARB', 0])
         if self.statement_every is not None:
             precode.extend(self.statement_every.emit(local_variables))
         precode.append([None, 'JZ', 0, '<%s>' % self.tag])
         
         # Finish
-        precode.append(['</%s>' % self.tag, 'ARB', 0])
+        precode.append(['<//%s>' % self.tag, 'ARB', 0])
 
         return precode
 
@@ -407,11 +409,11 @@ class NodeExpression:
                     raise RuntimeError('Variable \'%s\' seems undefined' % item)
                 
                 if v.is_global:
-                    precode.append([None, 'ADD', 0, v.address, 'RB[%d]' % rbo])
+                    precode.append(['<@global/>', 'ADD', 0, v.address, 'RB[%d]' % rbo])
                     #precode.append([None, 'ADD', 'RB[0]', v.address, 'RB[%d]' % rbo])
                     rbo += 1
                 else:
-                    precode.append([None, 'ADD', 'RB[0]', v.address, 'RB[%d]' % rbo])
+                    precode.append(['<@local/>', 'ADD', 'RB[0]', v.address, 'RB[%d]' % rbo])
                     rbo += 1
         return precode
 
@@ -459,7 +461,9 @@ def get_variable(text):
 
 def parse_statement(text, code, row):
     text = text.strip()
-    if text == 'break':
+    if text == 'continue':
+        return NodeGoto('continue_location')
+    elif text == 'break':
         return NodeGoto('break_location')
     elif text == 'return':
         return NodeGoto('return_location')
@@ -508,12 +512,7 @@ def read_variable_definition(code, row, is_global=False):
     vname, array_type, bracket_expression = get_variable(line[3:])
 
     if array_type:
-        if not bracket_expression.isnumeric():
-            raise SyntaxError('Invalid array-size (expected int-constant): \'%s\'' % bracket_expression, ('', row + 1, 0, code[row]))
-        array_size = int(bracket_expression)
-        if array_size <= 0:
-            raise SyntaxError('Array-size must be positive, not \'%d\'' % array_size, ('', row + 1, 0, code[row]))
-        
+        # Parse
         right_bracket = code[row].find(']')
         equals = code[row].find('=')
         left_curly = code[row].find('{')
@@ -521,6 +520,7 @@ def read_variable_definition(code, row, is_global=False):
         left_cite = code[row].find('"')
         right_cite = code[row].rfind('"')
 
+        # Extract initialization
         if right_bracket < equals and equals < left_cite and left_cite < right_cite and right_cite < semicolon:
             array_init = [ord(x) for x in code[row][(left_cite + 1):right_cite]] + [0]
         elif right_bracket < equals and equals < left_curly and left_curly < right_curly and right_curly < semicolon:
@@ -529,6 +529,17 @@ def read_variable_definition(code, row, is_global=False):
             array_init = None
         else:
             raise SyntaxError('Illegal array-initialization', ('', row + 1, 0, code[row]))
+        
+        # Array size
+        if bracket_expression == '' and array_init is not None:
+            array_size = len(array_init)
+        elif bracket_expression.isnumeric():
+            array_size = int(bracket_expression)
+            if array_size <= 0:
+                raise SyntaxError('Array-size must be positive, not \'%d\'' % array_size, ('', row + 1, 0, code[row]))
+        else:
+            raise SyntaxError('Invalid array-size (expected int-constant): \'%s\'' % bracket_expression, ('', row + 1, 0, code[row]))
+
         return NodeVariable(vname, array_size, is_global, array_init), row + 1
     else:
         return NodeVariable(vname, None, is_global, None), row + 1
@@ -850,7 +861,9 @@ def functions_to_link(functions, global_variables):
 if __name__ == '__main__':
     # > python intcode_cc.py -i math.c memory.c hello_world.c -o aout.txt && python intcode_vm.py aout.txt
     # sys.argv = ['intcode_cc.py', '-i', 'math.c', 'memory.c', '../2021/y2019_day01.c', '-o', 'aout.txt']
-    sys.argv = ['intcode_cc.py', '-i', 'test.c', '-o', 'aout.txt']
+    if len(sys.argv) == 1:
+        #sys.argv = ['intcode_cc.py', '-i', 'test.c', '-o', 'aout.txt']
+        sys.argv = ['intcode_cc.py', '-i', 'test2.c']
     #python ../intcode/intcode_cc.py -i math.c memory.c ../2021/y2019_day01.c -o aout.txt
 
     parser = argparse.ArgumentParser()
