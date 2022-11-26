@@ -1,9 +1,3 @@
-//
-// python intcode_cc.py -i test.c -o aout.txt && intcode_vm aout.txt
-//
-
-int msg[] = "Hello world!";
-
 int _buffer[20];
 void prints(int s) {
     for(; s[0]; s+=1) {
@@ -48,7 +42,12 @@ void scans(int target, int i_max, int delim, int i_read) {
         if((c <= 0) + (c == delim)) {
             break;
         }
-        if((delim == 10) * (c == 13)) {
+        if((delim == 32) * (c == 10)) {
+            // treat lf as a ws
+            break;
+        }
+        if(((delim == 10) + (delim == 32)) * (c == 13)) {
+            // ignore cr when delim is lf or ws
             continue;
         }
         target[i] = c;
@@ -74,21 +73,27 @@ void str2int(int s, int out) {
         sign = 1;
     }
     out[0] = 0;
-    for(; (48 <= s[0]) * (s[0] <= 57); s+=1) {
+    for(; (47 < s[0]) * (s[0] < 58); s+=1) {
         out[0] = 10*out[0] + s[0] - 48;
     }
+    out[0] *= sign;
 }
-
-void main() {
-    int buffer[20];
-    prints(msg);
-    printlf();
-
+void strcmp(int res, int s1, int s2) {
     int i;
-    int i_read;
-    for(i=0; i<5; i=i+1) {
-        scans(buffer, 19, 10, &i_read);
-        prints(buffer);
-        printlf();
+    for(i=0; s1[i]*(s1[i]==s2[i]); i+=1) {
     }
+    res[0] = s2[i] - s1[i];
+}
+void strncmp(int res, int s1, int s2, int i_max) {
+    int i;
+    for(i=0; (i<i_max)*s1[i]*(s1[i]==s2[i]); i+=1) {
+    }
+    res[0] = s2[i] - s1[i];
+}
+void strcpy(int dest, int src) {
+    int i;
+    for(i=0; src[i]; i+=1) {
+        dest[i] = src[i];
+    }
+    dest[i]=0;
 }

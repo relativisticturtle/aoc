@@ -1,12 +1,91 @@
-from collections import deque
-import os
+# This program is free software: you can redistribute it and/or modify  
+# it under the terms of the GNU General Public License as published by  
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but 
+# WITHOUT ANY WARRANTY; without even the implied warranty of 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License 
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 import sys
 import warnings
 import argparse
+from collections import deque
 
-import IntCode
+
+class NodeProgram:
+    """Top-node of the program
+
+    Holds functions and global variables.
+    """
+    def __init__(self, functions, global_variables):
+        self.global_variables = global_variables
+        self.functions = functions
+
+        for v in self.global_variables:
+            v.address = '<global_%s>' % v.name
+
+    def emit(self):
+        # --- HEADER ---
+        precode = []
+        precode.append(['<CODE>', 'ARB', '<STACK/>'])
+        precode.append(['<RB=...>', 'ADD', 0, '<STACK/>', 'RB[0]'])
+
+        # Call main
+        node_call = NodeCall('main', [])
+        precode.extend(node_call.emit([]))
+
+        # Stop
+        precode.append(['<STOP>', 'STOP'])
+        
+        # --- CODE ---
+        for node_fcn in self.functions:
+            precode.extend(node_fcn.emit(self.global_variables))
+
+        # Stop again. Unnecessary actually: Execution should not get here.
+        # ... but it's a convenient way to label the end of the code-section
+        precode.append(['</CODE>', 'STOP'])
+
+        # --- DATA SECTION ---
+        # global array variables can be large, but if they are uninitialized
+        # we can be strategic and put them last in thie data-section. They
+        # will then be rationalized away from the code
+
+        # Sort in order:
+        global_variables = sorted(self.global_variables, key=lambda v: 2 * int(v.array_size and v.array_size > 0) + int(v.array_init is None))
+
+        # Emit all scalars and pointers
+        for v in global_variables:
+            if v.array_size and v.array_size > 0:
+                precode.append(['<global_%s>' % v.name, '<global_%s_data>' % v.name])
+                if v.array_init is not None and len(v.array_init) > v.array_size:
+                    raise SyntaxError('Array cannot hold all that')
+            else:
+                precode.append(['<global_%s>' % v.name, 0])
+        
+        # Emit all array buffers
+        for v in global_variables:
+            if v.array_size and v.array_size > 0:
+                if v.array_init is not None and len(v.array_init) <= v.array_size:
+                    precode.append(['<global_%s_data>' % v.name, *(v.array_init + [0] * (v.array_size - len(v.array_init)))])
+                elif v.array_init is None:
+                    precode.append(['<global_%s_data>' % v.name, *([0] * v.array_size)])
+                else:
+                    raise SyntaxError('Array cannot hold all that')
+        
+        # That was all code and global memory. "Stack-memory" from here on.
+        precode.append(['<STACK/>', 0])
+        return precode
+
 
 class NodeFunction:
+    """Top-node of the program
+
+    Holds functions and global variables.
+    """
     def __init__(self, fname, parameters, block):
         self.fname = fname
         self.parameters = parameters
@@ -54,61 +133,17 @@ class NodeScope:
             max_stack_size = max(max_stack_size, subscope.setup_variables_on_stack(stack_size))
         return max_stack_size
     
-    def emit(self):
+    def emit(self, variables):
+        existing_variables = [v.name for v in variables]
+
         # Setup all local array variables
         precode = []
         for v in self.local_variables:
+            if v.name in existing_variables:
+                raise SyntaxError('Variable name-collision for \'%s\'' % v.name)
             if v.array_size and v.array_size > 0:
                 precode.append(['<int %s[]>' % v.name, 'ADD', 'RB[0]', v.address + 1, 'RB[%d]' % v.address])
-        return precode
-
-
-class NodeProgram:
-    def __init__(self, functions, global_variables):
-        self.global_variables = global_variables
-        self.functions = functions
-
-        for v in self.global_variables:
-            v.address = '<global_%s>' % v.name
-
-
-    def emit(self):
-        # --- HEADER ---
-        precode = []
-        precode.append(['<CODE>', 'ARB', '<STACK/>'])
-        precode.append(['<RB=...>', 'ADD', 0, '<STACK/>', 'RB[0]'])
-
-        # Call main
-        node_call = NodeCall('main', [])
-        precode.extend(node_call.emit([]))
-
-        # Stop
-        precode.append(['<STOP>', 'STOP'])
-        
-        # --- CODE ---
-        for node_fcn in functions:
-            precode.extend(node_fcn.emit(self.global_variables))
-
-        # --- STOP ---
-        precode.append(['</CODE>', 'STOP'])
-
-        # --- DATA SECTION ---
-        
-        # Setup all global variables
-        for v in self.global_variables:
-            # v.address = '<global_%s>' % v.name
-            if v.array_size and v.array_size > 0:
-                precode.append(['<global_%s>' % v.name, '<global_%s> + 1' % v.name])
-                if v.array_init is not None and len(v.array_init) <= v.array_size:
-                    precode.append(['<  [%d]>' % v.array_size, *(v.array_init + [0] * (v.array_size - len(v.array_init)))])
-                elif v.array_init is None:
-                    precode.append(['<  [%d]>' % v.array_size, *([0] * v.array_size)])
-                else:
-                    raise SyntaxError('Array cannot hold all that')
-            else:
-                precode.append(['<global_%s>' % v.name, 0])
-        
-        precode.append(['<STACK/>', 0])
+            existing_variables.append(v.name)
         return precode
 
 
@@ -117,13 +152,13 @@ class NodeBlock(NodeScope):
         super(NodeBlock, self).__init__(statements, local_variables)
         self.statements = statements
 
-    def emit(self, local_variables, **kwargs):
+    def emit(self, variables, **kwargs):
         # Emit code for this scope's local variables
-        precode = super(NodeBlock, self).emit()
+        precode = super(NodeBlock, self).emit(variables)
         
         # Delegate to statements
         for statement in self.statements:
-            precode.extend(statement.emit(local_variables + self.local_variables, **kwargs))
+            precode.extend(statement.emit(variables + self.local_variables, **kwargs))
         return precode
 
 
@@ -137,24 +172,24 @@ class NodeIfElse(NodeScope):
         self.iftrue = iftrue
         self.iffalse = iffalse
         
-    def emit(self, local_variables, **kwargs):
+    def emit(self, variables, **kwargs):
         # Emit code for this scope's local variables (shouldn't be any)
-        precode = super(NodeIfElse, self).emit()
+        precode = super(NodeIfElse, self).emit(variables)
         
         # Check condition
-        precode.extend(self.condition.emit(local_variables, 1))
+        precode.extend(self.condition.emit(variables, 1))
 
         # Jump around
         if self.iffalse is not None:
             precode.append(['<%s>' % self.tag, 'JZ', 'RB[1]', '<!%s>' % self.tag])
-            precode.extend(self.iftrue.emit(local_variables, **kwargs))
+            precode.extend(self.iftrue.emit(variables, **kwargs))
             precode.append([None, 'JZ', 0, '</%s>' % self.tag])
             precode.append(['<!%s>' % self.tag, 'ARB', 0])
-            precode.extend(self.iffalse.emit(local_variables, **kwargs))
+            precode.extend(self.iffalse.emit(variables, **kwargs))
             precode.append(['</%s>' % self.tag, 'ARB', 0])
         else:
             precode.append(['<%s>' % self.tag, 'JZ', 'RB[1]', '</%s>' % self.tag])
-            precode.extend(self.iftrue.emit(local_variables, **kwargs))
+            precode.extend(self.iftrue.emit(variables, **kwargs))
             precode.append(['</%s>' % self.tag, 'ARB', 0])
         return precode
 
@@ -178,28 +213,30 @@ class NodeFor(NodeScope):
         self.statement_1st = statement_1st
         self.statement_every = statement_every
         
-    def emit(self, local_variables, **kwargs):
+    def emit(self, variables, **kwargs):
         # Emit code for this scope's local variables (shouldn't be any)
-        precode = super(NodeFor, self).emit()
+        precode = super(NodeFor, self).emit(variables)
 
         # 1st
         if self.statement_1st is not None:
-            precode.extend(self.statement_1st.emit(local_variables))
+            precode.extend(self.statement_1st.emit(variables))
         
         # Check condition
         precode.append(['<%s>' % self.tag, 'ARB', 0])
-        precode.extend(self.condition.emit(local_variables, 1))
-        precode.append([None, 'JZ', 'RB[1]', '<//%s>' % self.tag])
+        if self.condition is not None:
+            precode.extend(self.condition.emit(variables, 1))
+            precode.append([None, 'JZ', 'RB[1]', '<//%s>' % self.tag])
+
         
         # Block
         kwargs['break_location'] ='<//%s>' % self.tag
         kwargs['continue_location'] ='</%s>' % self.tag
-        precode.extend(self.block.emit(local_variables, **kwargs))
+        precode.extend(self.block.emit(variables, **kwargs))
 
         # Post-iteration statement
         precode.append(['</%s>' % self.tag, 'ARB', 0])
         if self.statement_every is not None:
-            precode.extend(self.statement_every.emit(local_variables))
+            precode.extend(self.statement_every.emit(variables))
         precode.append([None, 'JZ', 0, '<%s>' % self.tag])
         
         # Finish
@@ -218,10 +255,10 @@ class NodeAssignment:
             raise SyntaxError('Cannot assign to %s' % self.target.text)
         self.target.postfix = self.target.postfix[:-1]
     
-    def emit(self, local_variables, **kwargs):
+    def emit(self, variables, **kwargs):
         precode = []
-        precode.extend(self.target.emit(local_variables, 1))
-        precode.extend(self.expression.emit(local_variables, 2))
+        precode.extend(self.target.emit(variables, 1))
+        precode.extend(self.expression.emit(variables, 2))
 
         deref_tag = NodeExpression.unique_deref_tag()
         precode.append(['<%s>' % deref_tag, 'ADD', 0, 'RB[1]', '[</%s> + 3]' % deref_tag])
@@ -246,21 +283,21 @@ class NodeCall:
         self.fname = fname
         self.parameters = parameters
         
-    def emit(self, local_variables, **kwargs):
+    def emit(self, variables, **kwargs):
         precode = []
 
         # Special builtins (print() and scan())
         if self.fname == 'print':
             if len(self.parameters) != 1:
                 raise SyntaxError('print() takes exactly 1 parameter')
-            precode.extend(self.parameters[0].emit(local_variables, 1))
+            precode.extend(self.parameters[0].emit(variables, 1))
             precode.append(['<PRINT/>', 'OUT', 'RB[1]'])
             return precode
         elif self.fname == 'scan':
             if len(self.parameters) != 1:
                 raise SyntaxError('scan() takes exactly 1 parameter')
             scan_call_id = 'SCAN_' + self.call_id[5:]
-            precode.extend(self.parameters[0].emit(local_variables, 1))
+            precode.extend(self.parameters[0].emit(variables, 1))
             precode.append(['<%s>' % scan_call_id, 'ADD', 0, 'RB[1]', '[</%s> + 1]' % scan_call_id])
             precode.append(['</%s>' % scan_call_id, 'IN', '[0]'])
             return precode
@@ -270,7 +307,7 @@ class NodeCall:
 
         # Put parameters (evaluate expressions as necessary) in RB[2], RB[3], ...
         for rbo, param in enumerate(self.parameters):
-            precode.extend(param.emit(local_variables, rbo + 2))
+            precode.extend(param.emit(variables, rbo + 2))
         
         # Jump to designated location
         precode.append(['</%s>' % self.call_id, 'JZ', 0, '<FCN_%s>' % self.fname])
@@ -287,63 +324,78 @@ class NodeExpression:
     def _infix_to_postfix(text):
         stk = deque()
         postfix = []
-        precedence = {'==': 1, '<': 1, '>': 1, '<=': 1, '>=': 1, '+': 2, '-': 2, '*': 3, '&': 9, '@': 9}
-
-        i = 0
-        while i < len(text):
-            if text[i].isspace():
-                i += 1
-            elif text[i].isalnum() or text[i] == '_':
-                j = 1
-                while i+j < len(text) and (text[i+j].isalnum() or text[i+j] == '_'):
-                    j += 1
-                
-                symbol = text[i:(i+j)]
-                postfix.append(symbol)
-                if is_valid_name(symbol):
-                    postfix.append('@')  # "At"-operator
-                i += j
-            elif text[i] == '&':
-                stk.append('&')
-                i += 1
-            elif text[i] == '[':
-                stk.append('[')
-                i += 1
-            elif text[i] == '(':
-                stk.append('(')
-                i += 1
-            elif text[i] == ')':
-                while len(stk) > 0 and stk[-1] != '(':
-                    postfix.append(stk.pop())
-                stk.pop() # Discard '('
-                i += 1
-            elif text[i] == ']':
-                while len(stk) > 0 and stk[-1] != '[':
-                    postfix.append(stk.pop())
-                stk.pop()  # Discard '['
-                postfix.append('+') # Dereference
-                postfix.append('@')  # "At"-operator
-                i += 1
-            else:
-                if i + 1 < len(text) and text[i:(i+2)] in precedence:
-                    symbol = text[i:(i+2)]
-                    i += 2
-                else:
-                    symbol = text[i]
+        precedence = {'==': 1, '<': 1, '>': 1, '<=': 1, '>=': 1, '+': 2, '-': 2, '*': 3, 'u+': 4, 'u-': 4, '&': 9, '@': 9}
+        try:
+            i = 0
+            # '+' and '-' can sometimes be unary operators
+            # use a state variable to determine when
+            unary_op = True
+            while i < len(text):
+                if text[i].isspace():
                     i += 1
-                while len(stk) > 0 and stk[-1] != '(' and stk[-1] != '[' and precedence[symbol] <= precedence[stk[-1]]:
-                    if stk[-1] == '&' and postfix[-1] == '@':
-                        postfix.pop()
-                        stk.pop()
-                    else:
+                elif text[i].isalnum() or text[i] == '_':
+                    j = 1
+                    while i+j < len(text) and (text[i+j].isalnum() or text[i+j] == '_'):
+                        j += 1
+                    
+                    symbol = text[i:(i+j)]
+                    postfix.append(symbol)
+                    if is_valid_name(symbol):
+                        postfix.append('@')  # "At"-operator
+                    i += j
+                    unary_op = False
+                elif text[i] == '&':
+                    stk.append('&')
+                    i += 1
+                    unary_op = True
+                elif text[i] == '[':
+                    stk.append('[')
+                    i += 1
+                    unary_op = True
+                elif text[i] == '(':
+                    stk.append('(')
+                    i += 1
+                    unary_op = True
+                elif text[i] == ')':
+                    while len(stk) > 0 and stk[-1] != '(':
                         postfix.append(stk.pop())
-                stk.append(symbol)
-        while len(stk) > 0:
-            if stk[-1] == '&' and postfix[-1] == '@':
-                postfix.pop()
-                stk.pop()
-            else:
-                postfix.append(stk.pop())
+                    stk.pop() # Discard '('
+                    i += 1
+                    unary_op = False
+                elif text[i] == ']':
+                    while len(stk) > 0 and stk[-1] != '[':
+                        postfix.append(stk.pop())
+                    stk.pop()  # Discard '['
+                    postfix.append('+') # Dereference
+                    postfix.append('@')  # "At"-operator
+                    i += 1
+                    unary_op = False
+                else:
+                    if i + 1 < len(text) and text[i:(i+2)] in precedence:
+                        symbol = text[i:(i+2)]
+                        i += 2
+                    else:
+                        symbol = text[i]
+                        i += 1
+                    if symbol in ['+', '-'] and unary_op:
+                        # Intercept unary operations "-a", "+a", ...
+                        symbol = 'u' + symbol
+                    unary_op = True
+                    while len(stk) > 0 and stk[-1] != '(' and stk[-1] != '[' and precedence[symbol] <= precedence[stk[-1]]:
+                        if stk[-1] == '&' and postfix[-1] == '@':
+                            postfix.pop()
+                            stk.pop()
+                        else:
+                            postfix.append(stk.pop())
+                    stk.append(symbol)
+            while len(stk) > 0:
+                if stk[-1] == '&' and postfix[-1] == '@':
+                    postfix.pop()
+                    stk.pop()
+                else:
+                    postfix.append(stk.pop())
+        except IndexError:
+            raise SyntaxError('Failed to parse: \'%s\'' % text)
         
         return postfix
 
@@ -351,7 +403,7 @@ class NodeExpression:
         self.text = text
         self.postfix = NodeExpression._infix_to_postfix(text)
     
-    def emit(self, local_variables, rbo):
+    def emit(self, variables, rbo):
         precode = []
         rbo0 = rbo
         for item in self.postfix:
@@ -383,13 +435,15 @@ class NodeExpression:
                 assert rbo > rbo0
                 rbo -= 1
                 precode.append(['<x+y>', 'ADD', 'RB[%d]' % (rbo - 1), 'RB[%d]' % rbo, 'RB[%d]' % (rbo - 1)])
-            elif item == '-' and rbo == rbo0 + 1:  # Invert sign
-                precode.append(['<-x>', 'MUL', -1, 'RB[%d]' % (rbo - 1), 'RB[%d]' % (rbo - 1)])
             elif item == '-':  # Subtract 2 top items in stack
                 assert rbo > rbo0
                 rbo -= 1
                 precode.append([None, 'MUL', -1, 'RB[%d]' % rbo, 'RB[%d]' % rbo])
                 precode.append(['<x-y>', 'ADD', 'RB[%d]' % (rbo - 1), 'RB[%d]' % rbo, 'RB[%d]' % (rbo - 1)])
+            elif item == 'u+': # no-invert. do nothing
+                pass
+            elif item == 'u-': # Invert sign
+                precode.append(['<-x>', 'MUL', -1, 'RB[%d]' % (rbo - 1), 'RB[%d]' % (rbo - 1)])
             elif item == '*':  # Multiplicate 2 top items in stack
                 assert rbo > rbo0
                 rbo -= 1
@@ -402,11 +456,12 @@ class NodeExpression:
                 precode.append(['<%s/>' % item, 'ADD', 0, int(item), 'RB[%d]' % rbo])
                 rbo += 1
             else:
-                for v in local_variables[::-1]:
+                # Must be variable (or?)
+                for v in variables[::-1]:
                     if v.name == item:
                         break
                 else:
-                    raise RuntimeError('Variable \'%s\' seems undefined' % item)
+                    raise SyntaxError('Unexpected \'%s\' in expression \'%s\'' % (item, self.text))
                 
                 if v.is_global:
                     precode.append(['<@global/>', 'ADD', 0, v.address, 'RB[%d]' % rbo])
@@ -467,13 +522,13 @@ def parse_statement(text, code, row):
         return NodeGoto('break_location')
     elif text == 'return':
         return NodeGoto('return_location')
-    elif 0 < text.find('(') and (text.find('=') == -1 or text.find('(') < text.find('=')):
+    elif 0 < text.find('(') and (text.find('=') == -1 or text.find('(') < text.find('=')) and (text.find('[') == -1 or text.find('(') < text.find('[')):
         left_paren = text.find('(')
         right_paren = text.rfind(')')
         if not (0 < left_paren and left_paren < right_paren):
             raise SyntaxError('Parenthesis \'()\' mis-match', ('', row + 1, 0, code[row]))
         if not (is_valid_name(text[:left_paren]) and is_empty_or_comment(text[(right_paren + 1):])):
-            raise SyntaxError('Failed to parse function', ('', row + 1, 0, code[row]))
+            raise SyntaxError('Failed to parse function call', ('', row + 1, 0, code[row]))
         fname = text[:left_paren]
         args = [a.strip() for a in text[(left_paren + 1):right_paren].split(',')]
         return NodeCall(fname, [NodeExpression(a) for a in args])
@@ -564,7 +619,7 @@ def read_forloop(code, row):
         raise SyntaxError('Expected \'for (...; ...; ...) {\'', ('', row + 1, 0, code[row]))
     
     statement1_text = forloop_line[(left_paren+1):semicolon1].strip()
-    condition = NodeExpression(forloop_line[(semicolon1+1):semicolon2])
+    condition_text = forloop_line[(semicolon1+1):semicolon2].strip()
     statement2_text = forloop_line[(semicolon2+1):right_paren].strip()
     should_be_empty_1 = forloop_line[(right_paren+1):left_curly].strip()
     should_be_empty_2 = forloop_line[(left_curly+1):].strip()
@@ -574,6 +629,8 @@ def read_forloop(code, row):
     if not (should_be_empty_2 == ''):
         raise SyntaxError('Unexpected \'%s\' in if-else-statement' % should_be_empty_2, ('', row + 1, 0, code[row]))
     
+    condition = NodeExpression(condition_text) if condition_text != '' else None
+
     statements = []
     for statement_text in [statement1_text, statement2_text]:
         if statement_text == '':
@@ -741,8 +798,8 @@ def read_file(input_file):
                 node_fcn, row = read_function(code, row)
                 functions.append(node_fcn)
     except SyntaxError as e:
-        print('\nERROR: %s, in %s:' % (e.msg, input_file))
-        print('\n%5d: %s' % (e.lineno, e.text))
+        print('\nERROR: {}, in {}:'.format(e.msg, input_file))
+        print('\n{}: {}'.format(e.lineno, e.text))
         sys.exit(1)
     return functions, global_variables
 
@@ -811,9 +868,13 @@ def assemble_precode_to_intcode(precode):
                 intcode[p] = label_lookup.get(c, c) + offset
             else:
                 intcode[p] = label_lookup.get(c, c)
-        intcode[p] = int(intcode[p])
+        try:
+            intcode[p] = int(intcode[p])
+        except ValueError:
+            print('\nERROR: Symbol \'{}\' could not be resolved.'.format(intcode[p]))
+            sys.exit(1)
     
-    return intcode, labels
+    return intcode, label_lookup, labels
 
 
 def functions_to_link(functions, global_variables):
@@ -858,17 +919,15 @@ def functions_to_link(functions, global_variables):
     return fcn_to_link, glb_to_link
 
 
-if __name__ == '__main__':
-    # > python intcode_cc.py -i math.c memory.c hello_world.c -o aout.txt && python intcode_vm.py aout.txt
-    # sys.argv = ['intcode_cc.py', '-i', 'math.c', 'memory.c', '../2021/y2019_day01.c', '-o', 'aout.txt']
+def main():
     if len(sys.argv) == 1:
-        #sys.argv = ['intcode_cc.py', '-i', 'test.c', '-o', 'aout.txt']
-        sys.argv = ['intcode_cc.py', '-i', 'test2.c']
-    #python ../intcode/intcode_cc.py -i math.c memory.c ../2021/y2019_day01.c -o aout.txt
+        sys.argv = ['intcode_cc.py', '-v', '-i', 'math.c', 'string.c', 'sort.c', 'test.c', '-o', 'test.txt']
+        #sys.argv = ['intcode_cc.py', '-v', '-i', 'test_neg.c', '-o', 'test.txt']
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type=str, nargs='+', required=True)
     parser.add_argument('-o', '--output', type=str, default=None)
+    parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
 
     # Read code
@@ -881,22 +940,27 @@ if __name__ == '__main__':
     
     # Prune unnecessary code and global variables
     fcn_to_link, glb_to_link = functions_to_link(functions, global_variables)
-    if False:
-        print('--- FUNCTIONS ---')
+    if args.verbose:
+        print('---------------- FUNCTIONS ----------------')
         for f in fcn_to_link:
             print('  void %s()' % f)
-        print('--- GLOBAL VARIABLES ---')
+        print('---------------- GLOBAL VARIABLES ----------------')
         for g in glb_to_link:
             print('  int %s' % g)
     functions = [f for f in functions if f.fname in fcn_to_link]
     global_variables = [g for g in global_variables if g.name in glb_to_link]
 
     # Compile!
-    program = NodeProgram(functions, global_variables)
-    precode = program.emit()
+    try:
+        program = NodeProgram(functions, global_variables)
+        precode = program.emit()
+    except SyntaxError as e:
+        print('\nERROR: {}'.format(e.msg, input_file))
+        sys.exit(1)
 
-    if False:
+    if args.verbose:
         # Print what we got
+        print('---------------- PSEUDO INTCODE ----------------')
         for line in precode:
             if line[0] is not None:
                 print(('%30s : ' % line[0]) + str(line[1:]))
@@ -904,33 +968,40 @@ if __name__ == '__main__':
                 print(('%30s : ' % '') + str(line[1:]))
 
     # Link!
-    intcode, labels = assemble_precode_to_intcode(precode)
-    #for l, n in enumerate(intcode):
-    #    print('%5d : %s' % (l, n))
+    intcode, label_lookup, _ = assemble_precode_to_intcode(precode)
+
+    if args.verbose:
+        print('---------------- LABELS ----------------')
+        for label in label_lookup:
+            l = label.strip()[1:-1]
+            while l[0] == '/':
+                l = l[1:]
+            if l[-1] == '/':
+                l = l[:-1]
+            try:
+                int(l)
+                continue
+            except:
+                pass
+            if l.startswith('@') or l.startswith('RB=') or l.startswith('RB_new'):
+                continue
+            if l.startswith('IF_') or l.startswith('!IF_') or l.startswith('FOR_') or l.startswith('CALL_'):
+                pass #continue
+            if l.startswith('SCAN_') or l.startswith('PRINT'):
+                continue
+            if l in ['x+y', 'x-y', 'x*y', 'x<y', 'x>y', 'x<=y', 'x>=y', 'x==y', '-x']:
+                continue
+            print('%30s : %d' % (label.strip(), label_lookup[label]))
+
+    # Prune trailing 0's
+    last_nonzero = max(idx for idx, val in enumerate(intcode) if val != 0)
+    intcode = intcode[:(last_nonzero+1)]
 
     if args.output is not None:
         with open(args.output, 'w') as f:
             f.write(','.join(['%d' % c for c in intcode]))
-    else:
-        print('')
-        print('------------------------------------ RUNNING ------------------------------------')
-        machine = IntCode.Machine(intcode)
-        machine.blocked = False
+            f.write('\n')
 
-        max_steps = 10000
-        while not machine.halted and max_steps > 0:
-            instruction_length, disasm = machine.peek_forward()
-            print("%20s %5d | %s" % (labels.get(machine.pos, ''), machine.pos, disasm))
-            if machine.blocked:
-                text = ''
-                while len(text) == 0:
-                    text = input('> ')
-                machine.push_input(int(text))
-                machine.blocked = False
-            else:
-                input()
-            machine.step_forward()
-            max_steps -= 1
-        print('-------------------------------------- DONE -------------------------------------')
-        for out in machine.pop_output():
-            print(out)
+
+if __name__ == '__main__':
+    main()

@@ -19,6 +19,9 @@ venv/
 # AoC input files
 input*.txt
 
+# Session-file
+session.txt
+
 # Binaries
 *.exe
 *.obj

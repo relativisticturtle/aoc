@@ -6,6 +6,7 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 
 #define MAX_SIZE 100000000
@@ -74,8 +75,6 @@ int64_t run(int io_format) {
         int A = (code[i] / 10000) % 10;
         int B = (code[i] / 1000) % 10;
         int C = (code[i] / 100) % 10;
-        
-        //std::cout << "[" << i << "] " << code[i] << " : " << code[i + 1] << ", " << code[i + 2] << ", " << code[i + 3] << std::endl;
 
         switch(OP) {
         case 1:
@@ -141,41 +140,67 @@ int64_t run(int io_format) {
     return n;
 }
 
+void print_usage_and_exit(const char* program_name) {
+    std::cout << "Usage: " << program_name << " [-d]  [-v]  intcode_file.txt" << std::endl;
+    exit(EXIT_FAILURE);
+}
 
 int main(int argc, const char* argv[]) {
     //
     // Parse arguments
     //
-    int io_format = 0;
-    int code_p = 0;
-    int verbose = 0;
+    int io_format = 1;  // I/O format. 0: Integers, 1: ASCII
+    int code_p = 0;     // Index of IntCode-program file
+    int verbose = 0;    // Verbose mode?
     for(int j=1; j<argc; j++) {
-        if(strcmp(argv[j], "-r") == 0)
-            io_format = 1;
+        if(strcmp(argv[j], "-d") == 0)
+            io_format = 0;
         else if(strcmp(argv[j], "-v") == 0)
             verbose = 1;
         else if(code_p == 0)
             code_p = j;
         else {
-            std::cout << "Usage: " << argv[0] << " [-r] intcode_file.txt" << std::endl;
-            exit(EXIT_FAILURE);
+            print_usage_and_exit(argv[0]);
         }
     }
-    if(code_p == 0) {
-        std::cout << "Usage: " << argv[0] << " [-r] intcode_file.txt" << std::endl;
-        exit(EXIT_FAILURE);
+
+    // Zero-set program-memory
+    std::memset(code, 0, sizeof code);
+
+    // IntCode from file or stdin?
+    std::ifstream infile;
+    std::istringstream firstline;
+    if(0 < code_p) {
+        infile.open(argv[code_p]);
+        if(!infile) {
+            std::cout << "Failed to read file " << argv[code_p] << "." << std::endl;
+            print_usage_and_exit(argv[0]);
+        }
     }
+    else {
+        std::string line;
+        std::getline(std::cin, line);
+        firstline.str(line);
+    }
+    std::istream& program_stream = infile.is_open() ? static_cast<std::istream&>(infile) : firstline;
 
     //
-    // Read data file
+    // Read the IntCode
     //
-    std::memset(code, 0, sizeof code);
-    std::ifstream infile(argv[code_p]);
     int i;
-    for(i=0; i<MAX_SIZE && !infile.eof() && infile.good();) {
-        infile >> code[i++];
-        if (infile.peek() == ',')
-            infile.ignore();
+    for(i=0; program_stream && i<MAX_SIZE; i++) {
+        // Discard whitespaces, read up to comma, attempt parse as integer
+        char buffer[20];
+        program_stream >> std::skipws;
+        program_stream.getline(buffer, 20, ',');
+        if(!(std::stringstream(buffer) >> code[i])) {
+            // Failed to parse as integer.
+            // Break, but first check if non-ASCII flag:
+            if(buffer[0] == 'D') {
+                io_format = 0;
+            }
+            break;
+        }
     }
     if(verbose) {
         std::cout << i << " integers read" << std::endl;
