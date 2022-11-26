@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+import itertools
 
 #from collections import deque
 
@@ -9,19 +10,31 @@ def run(indata):
     
     # ----------- PART 1 -----------
     #
-    answer = np.sum([int(l) for l in L])
+    fabric = np.zeros((1000, 1000))
+    for l in L:
+        f = l.split()
+        cid = int(f[0][1:])
+        x = int(f[2].split(',')[0])
+        y = int(f[2].split(',')[1][:-1])
+        w = int(f[3].split('x')[0])
+        h = int(f[3].split('x')[1])
+        fabric[y:(y+h), x:(x+w)] += 1
+
+    answer = np.sum(fabric > 1)
     print("Part 1: {}".format(answer))
     
     # ----------- PART 2 -----------
     #
-    f = 0
-    idx = 0
-    freq = set()
-    while f not in freq:
-        freq.add(f)
-        f += int(L[idx])
-        idx = (idx + 1) % len(L)
-    answer = f
+    for l in L:
+        f = l.split()
+        cid = int(f[0][1:])
+        x = int(f[2].split(',')[0])
+        y = int(f[2].split(',')[1][:-1])
+        w = int(f[3].split('x')[0])
+        h = int(f[3].split('x')[1])
+        if np.all(fabric[y:(y+h), x:(x+w)] == 1):
+            answer = cid
+            break
     print("Part 2: {}".format(answer))
     
 

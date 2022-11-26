@@ -8,12 +8,16 @@ from datetime import datetime
 # - "Storage" > "Session Storage" > "Cookies" > https://adventofcode.com
 # - Copy&paste to session.txt
 
+# Installing virtual environment
+# python -m venv --prompt aoc .venv
+
 def _download_input(day, year):
     url = 'https://adventofcode.com/%d/day/%d/input' % (year, day)
+    session_file = os.path.join(os.path.dirname(__file__), 'session.txt')
 
-    if not os.path.isfile('session.txt'):
+    if not os.path.isfile(session_file):
         raise FileNotFoundError('Missing \'session.txt\' (read in source-code how to obtain)')
-    with open('session.txt') as f:
+    with open(session_file) as f:
         session = f.readline()
 
     try:
@@ -28,9 +32,17 @@ def _download_input(day, year):
         return None
 
 
-def get_input(day, year):
+def get_input(day, year, test=None):
+    if test is not None:
+        filename = os.path.join('input%02d_%s.txt' % (day, test))
+        print('Reading test-file \'%s\'...' % filename)
+        with open(filename) as f:
+            data = f.read()
+        print('Done!')
+        return data
+
     # Cache input to avoid unnecessary server-load
-    filename = os.path.join('%4d' % year, 'input%02d.txt' % day)
+    filename = os.path.join('input%02d.txt' % day)
     if os.path.isfile(filename):
         print('Reading local \'%s\'...' % filename)
         with open(filename) as f:
