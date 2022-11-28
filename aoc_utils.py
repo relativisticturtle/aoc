@@ -71,7 +71,7 @@ def clipboard_set(text):
 			print("Warning: couldn't copy to clipboard")
 	except ImportError:
 		print("Warning: no clipboard module")
-
+    
 
 if __name__ == '__main__':
     input = get_input(datetime.now().day, datetime.now().year)
