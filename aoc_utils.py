@@ -14,7 +14,9 @@ from datetime import datetime
 def _download_input(day, year):
     url = 'https://adventofcode.com/%d/day/%d/input' % (year, day)
     session_file = os.path.join(os.path.dirname(__file__), 'session.txt')
-
+    # https://www.reddit.com/r/adventofcode/comments/z9dhtd/please_include_your_contact_info_in_the_useragent/
+    user_agent = 'github.com/relativisticturtle/aoc ({}) by mxrten@gmail.com'.format(os.path.basename(__file__))
+    
     if not os.path.isfile(session_file):
         raise FileNotFoundError('Missing \'session.txt\' (read in source-code how to obtain)')
     with open(session_file) as f:
@@ -22,7 +24,7 @@ def _download_input(day, year):
 
     try:
         print('Downloading...')
-        read = requests.get(url, cookies={'session': session})
+        read = requests.get(url, cookies={'session': session}, headers={'User-Agent': user_agent})
         data = [chunk for chunk in read.iter_content(chunk_size=512)]
         data = b''.join(data).decode()
         print('Done!')
