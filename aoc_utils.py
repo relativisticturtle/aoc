@@ -33,8 +33,9 @@ def _download_input(day, year):
 
 
 def get_input(day, year, test=None):
+    year_folder = os.path.join(os.path.dirname(__file__), str(year))
     if test is not None:
-        filename = os.path.join('input%02d_%s.txt' % (day, test))
+        filename = os.path.join(year_folder, 'input%02d_%s.txt' % (day, test))
         print('Reading test-file \'%s\'...' % filename)
         with open(filename) as f:
             data = f.read()
@@ -42,7 +43,7 @@ def get_input(day, year, test=None):
         return data
 
     # Cache input to avoid unnecessary server-load
-    filename = os.path.join('input%02d.txt' % day)
+    filename = os.path.join(year_folder, 'input%02d.txt' % day)
     if os.path.isfile(filename):
         print('Reading local \'%s\'...' % filename)
         with open(filename) as f:
