@@ -2,8 +2,6 @@ import os
 import sys
 import numpy as np
 
-#from collections import deque
-
 def run(indata):
     L = indata.splitlines(keepends=False)
     S = np.array([(ord(l[0]) - ord('A') + 1, ord(l[2]) - ord('X') + 1) for l in L])

@@ -2,8 +2,6 @@ import os
 import sys
 import numpy as np
 
-#from collections import deque
-
 def run(indata):
     L = indata.splitlines(keepends=False)
     

@@ -1,32 +1,21 @@
 import os
 import sys
+import numpy as np
 
 def run(indata):
     L = indata.splitlines(keepends=False)
     
     # ----------- PART 1 -----------
     #
-    R = [(set([i for i in l[:(len(l)//2)]]), set([i for i in l[(len(l)//2):]])) for l in L]
-    I = [r[0].intersection(r[1]) for r in R]
-    answer = 0
-    for i in I:
-        assert len(i) == 1
-        for _i in i:
-            answer += ord(_i) - ord('a') + 1 if _i == _i.lower() else ord(_i) - ord('A') + 27
-
+    data = np.array([[int(d) for d in r.split()] for r in L])
+    sdata = np.sort(data, axis=1)
+    answer = np.sum(sdata[:, 0] + sdata[:, 1] > sdata[:, 2])
     print("Part 1: {}".format(answer))
     
     # ----------- PART 2 -----------
     #
-    answer = 0
-    for g in range(len(L)//3):
-        r1 = set([i for i in L[3*g + 0]])
-        r2 = set([i for i in L[3*g + 1]])
-        r3 = set([i for i in L[3*g + 2]])
-        for i in r1.intersection(r2).intersection(r3):
-            assert len(i) == 1
-            for _i in i:
-                answer += ord(_i) - ord('a') + 1 if _i == _i.lower() else ord(_i) - ord('A') + 27
+    sdata = np.sort(data.reshape((-1, 3, 3)), axis=1)
+    answer = np.sum(sdata[:, 0, :] + sdata[:, 1, :] > sdata[:, 2, :])
     print("Part 2: {}".format(answer))
     
 

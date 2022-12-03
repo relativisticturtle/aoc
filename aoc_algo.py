@@ -33,5 +33,3 @@ def chinese_remainder_theorem(remainders, moduli):
         x = x % M
 
     return x
-
-
