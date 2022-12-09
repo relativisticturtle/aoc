@@ -15,7 +15,7 @@ def _download_input(day, year):
     url = 'https://adventofcode.com/%d/day/%d/input' % (year, day)
     session_file = os.path.join(os.path.dirname(__file__), 'session.txt')
     # https://www.reddit.com/r/adventofcode/comments/z9dhtd/please_include_your_contact_info_in_the_useragent/
-    user_agent = 'github.com/relativisticturtle/aoc ({}) by mxrten@gmail.com'.format(os.path.basename(__file__))
+    user_agent = 'github.com/relativisticturtle/aoc by mxrten@gmail.com'
     
     if not os.path.isfile(session_file):
         raise FileNotFoundError('Missing \'session.txt\' (read in source-code how to obtain)')
