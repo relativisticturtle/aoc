@@ -25,3 +25,5 @@ session.txt
 # Binaries
 *.exe
 *.obj
+*.png
+*.gif
