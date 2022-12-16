@@ -79,7 +79,7 @@ def run(indata):
         j += 1
         if j % 10 == 0:
             I = np.dstack([N*63 + np.clip(M,0,8)*24, N*63 - np.clip(M,0,8)*4, N*63 - np.clip(M,0,8)*4]).astype(np.uint8)
-            plt.imsave('knots_{:04d}.png'.format(j), I)
+            #plt.imsave('knots_{:04d}.png'.format(j), I)
 
         if True:
             for i in range(0, 10):

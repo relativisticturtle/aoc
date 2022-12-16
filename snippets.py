@@ -1,6 +1,7 @@
-
+##########################
 # NetworkX
-
+#
+#
 import networkx as nx
 G = nx.DiGraph()
 a = 'node1'
@@ -38,3 +39,18 @@ M = M_left @ M_fw @ M_right @ np.linalg.matrix_power(M_fw, 5)
 pos = M[:2, 3].round().astype(int)
 visited = {tuple(pos): 1}                       # Use dict for book-keeping?
 visited[tuple(pos)] = 'Kilroy'
+
+
+
+# SEARCH (using Queues)
+from collections import deque
+Q = deque()
+Q.append(('START', 0))
+V = dict()
+while len(Q) > 0:
+    word, value = Q.popleft()
+    for i in range(1, len(word)):
+        if word[i:] not in V:
+            Q.append((word, value + i))
+            V[word[i:]] = value + i
+answer = sum(V.values())
