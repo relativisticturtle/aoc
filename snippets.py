@@ -12,10 +12,8 @@ outbound_nodes = [edge[1] for edge in G.out_edges(a)]
 
 
 
-
-
 ##########################
-#  Walking on grid
+# WALKING on grid
 #
 #
 #  Right-hand system:
@@ -42,7 +40,10 @@ visited[tuple(pos)] = 'Kilroy'
 
 
 
+##########################
 # SEARCH (using Queues)
+#
+#
 from collections import deque
 Q = deque()
 Q.append(('START', 0))
@@ -54,3 +55,34 @@ while len(Q) > 0:
             Q.append((word, value + i))
             V[word[i:]] = value + i
 answer = sum(V.values())
+
+
+
+##########################
+# INSTRUCTIONS
+#
+#
+L = ['add x, 1', 'cmp y, 0']
+C = [l.split() for l in L]
+C = [[l.split()[0]] + ' '.join(l.split()[1:]).split(', ') for l in L]
+
+i = 0
+while i < len(C):
+    # REMEMBER TO "i += 1" AT ANY CONTINUE!
+    if C[i][0] == 'add':
+        print('add {} {}'.format(*C[i][1:]))
+    elif C[i][0] == 'cmp':
+        print('cmp {} {}'.format(*C[i][1:]))
+    i += 1
+
+
+##########################
+# CHINESE REMAINDER THEOREM
+#
+#
+from aoc_algo import chinese_remainder_theorem
+remainders = [1, 2, 3, 4, 5]
+moduli = [5, 14, 13, 27, 11]
+print('\n' + '\n'.join(['x == {} (mod {:2d})'.format(r, m) for r, m in zip(remainders, moduli)]))
+x = chinese_remainder_theorem(remainders, moduli)
+print('--> x = {}'.format(x))
