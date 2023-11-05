@@ -2,14 +2,6 @@ import os
 import requests
 from datetime import datetime
 
-# Getting session-cookie using Chrome:
-# - Navigate to Advent of Code and login
-# - Right-click > "Inspect" > "Application"-tab
-# - "Storage" > "Session Storage" > "Cookies" > https://adventofcode.com
-# - Copy&paste to session.txt
-
-# Installing virtual environment
-# python -m venv --prompt aoc .venv
 
 def _download_input(day, year):
     url = 'https://adventofcode.com/%d/day/%d/input' % (year, day)
