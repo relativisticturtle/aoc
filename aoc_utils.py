@@ -1,4 +1,5 @@
 import os
+import inspect
 import requests
 from datetime import datetime
 
@@ -10,7 +11,7 @@ def _download_input(day, year):
     user_agent = 'github.com/relativisticturtle/aoc by mxrten@gmail.com'
     
     if not os.path.isfile(session_file):
-        raise FileNotFoundError('Missing \'session.txt\' (read in source-code how to obtain)')
+        raise FileNotFoundError('Missing \'session.txt\' (read in README.md how to obtain)')
     with open(session_file) as f:
         session = f.readline()
 
@@ -26,7 +27,13 @@ def _download_input(day, year):
         return None
 
 
-def get_input(day, year, test=None):
+def get_input(day=None, year=None, test=None):
+    if year is None:
+        year = os.path.basename(os.path.dirname(inspect.stack()[1].filename))
+
+    if day is None:
+        day = int(os.path.basename(inspect.stack()[1].filename)[3:5])
+
     year_folder = os.path.join(os.path.dirname(__file__), str(year))
     if test is not None:
         filename = os.path.join(year_folder, 'input%02d_%s.txt' % (day, test))
