@@ -112,6 +112,9 @@ class Search:
 
     def total_cost(self, state):
         return self._total_cost.get(state, None)
+    
+    def visited(self):
+        return self._total_cost.keys()
 
     def finished(self, state):
         return False
