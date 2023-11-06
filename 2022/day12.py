@@ -16,7 +16,7 @@ def run(indata):
     
     # ----------- PART 1 -----------
     #
-    vis = np.zeros((472,) + M.shape)
+    #vis = np.zeros((472,) + M.shape)
 
     Q = deque()
     Q.append((s, 'a', 0))
@@ -30,7 +30,7 @@ def run(indata):
         else:
             V.add(p)
         
-        vis[x:, p[0], p[1]] = x
+        #vis[x:, p[0], p[1]] = x
 
         if p[0] > 0 and ord(M[p[0] - 1, p[1]]) <= ord(h) + 1:
             Q.append( ( (p[0] - 1, p[1]), M[p[0] - 1, p[1]], x + 1) )
@@ -45,12 +45,12 @@ def run(indata):
     print("Part 1: {}".format(answer))
 
     # Visualize
-    N = np.array([[ord(x) - ord('a') for x in m] for m in M]) / (ord('z') - ord('a'))
-    vis = ((vis / 472) + (vis > 0)) / 2
-    N = np.clip(np.stack([N + 0.5 * vis, N - 0.5 * vis, N - 0.5 * vis], 3), 0, 1)
-    import matplotlib.pyplot as plt
-    for j in range(N.shape[0]):
-        plt.imsave('track_{:03d}.png'.format(j), N[j, ...])
+    #N = np.array([[ord(x) - ord('a') for x in m] for m in M]) / (ord('z') - ord('a'))
+    #vis = ((vis / 472) + (vis > 0)) / 2
+    #N = np.clip(np.stack([N + 0.5 * vis, N - 0.5 * vis, N - 0.5 * vis], 3), 0, 1)
+    #import matplotlib.pyplot as plt
+    #for j in range(N.shape[0]):
+    #    plt.imsave('track_{:03d}.png'.format(j), N[j, ...])
 
     
     # ----------- PART 2 -----------
