@@ -38,7 +38,7 @@ def chinese_remainder_theorem(remainders, moduli):
         x == r2 (mod m2)
         ...
         x == rN (mod mN)
-    
+
     Input
         remainders: [r1, r2, ... rN]
         moduli:     [m1, m2, ... mN]
@@ -66,61 +66,117 @@ def chinese_remainder_theorem(remainders, moduli):
 
 
 class Search:
-    def __init__(self, initial_state=None, initial_cost=0, initial_states=None, initial_costs=0):
-        # One or more initial states
-        if initial_state is not None:
-            self.initial_states = [(initial_state, initial_cost)]
-        else:
-            self.initial_states = []
-        if initial_states is not None:
-            if not hasattr(initial_costs, '__len__'):
-                initial_costs = [0] * len(initial_states)
-            elif len(initial_costs) != len(initial_states):
-                raise ValueError('`initial_costs` must have same length as `initial_states` (or be scalar)')
-            self.initial_states.extend(zip(initial_states, initial_costs))
+    def __init__(self):
+        self._result = dict()   # Outcome at each visited node
+        self._previous = dict() # Node prior to this
+        self._finish = None
 
-        # For book-keeping of visited states
-        # (as a dict rather than set - to allow memoization)
-        self._total_cost = dict()
-        self._previous = dict()
+    def get_result(self, node=None):
+        if node is None:
+            return self._result.get(self._finish, None)
+        else:
+            return self._result.get(node, None)
+
+    def get_finish(self):
+        return self._finish
+
+    def get_visited(self):
+        return self._result.keys()
+    
+    def get_path_to(self, node=None):
+        path = [node if node is not None else self._finish]
+        while path[-1] in self._previous:
+            path.append(self._previous[path-1])
+        return path[::-1]
+
+    def run(self, *args, **kwargs):
+        raise NotImplementedError('Search-class is virtual')
+
+    def adjacencies(self, node):
+        return []
+
+    def evaluate(self, node, *args, **kwargs):
+        return None
+
+
+class BFS(Search):
+    def __init__(self):
+        super().__init__()
+        self._initial_nodes = []
+
+    def append_initial(self, initial_node, initial_cost=0):
+        self._initial_nodes.append((initial_node, initial_cost))
+        return self
+
+    def extend_initial(self, initial_nodes, initial_costs=0):
+        if not hasattr(initial_costs, '__len__'):
+            initial_costs = [0] * len(initial_nodes)
+        elif len(initial_costs) != len(initial_nodes):
+            raise ValueError('`initial_costs` must have same length as `initial_nodes` (or be scalar)')
+        self._initial_nodes.extend(zip(initial_nodes, initial_costs))
+        return self
 
     def run(self):
         from collections import deque
         Q = deque()
-        Q.extend(self.initial_states)
+        Q.extend(self._initial_nodes)
+
+        # Reset these prior to running
+        self._finish = None
+        self._initial_nodes = []
+
+        # Run!
         while len(Q) > 0:
-            # Get state and check if actual (not yet visited)
-            state, total_cost = Q.popleft()
-            if state in self._total_cost:
+            # Get node and check if actual (not yet visited)
+            node, total_cost = Q.popleft()
+            if node in self._result:
                 continue
-            self._total_cost[state] = total_cost
+            self._result[node] = total_cost
 
             # Evaluate
-            if self.finished(state):
-                return state
+            if self.finished(node):
+                self._finish = node
+                return self
             
-            # Get candidates and cost of going there
-            candidates = self.candidates(state)
-            costs = [self.cost(state, c) for c in candidates]
+            # Get adjacencies and cost of going there
+            adjacencies = self.adjacencies(node)
+            costs = [self.evaluate(node, a) for a in adjacencies]
 
             # Submit to queue
-            for candidate, cost in zip(candidates, costs):
-                self._previous[candidate] = state
-                Q.append((candidate, total_cost + cost))
+            for adjacent, cost in zip(adjacencies, costs):
+                self._previous[adjacent] = node
+                Q.append((adjacent, self._result[node] + cost))
         # Search ended without finding goal
-        return None
+        return self
 
-    def total_cost(self, state):
-        return self._total_cost.get(state, None)
+    def evaluate(self, node, adjacent):
+        return 1
     
-    def visited(self):
-        return self._total_cost.keys()
-
-    def finished(self, state):
+    def finished(self, node):
         return False
 
-    def candidates(self, from_state):
-        raise NotImplementedError()
 
-    def cost(self, from_state, to_state):
-        return 1
+class Recursive(Search):
+    def run(self, node):
+        # Top-node is finish
+        self._run(node)
+        self._finish = node
+        # Return self to allow method cascading
+        return self
+
+    def _run(self, node):
+        # Get adjacencies
+        adjacencies = self.adjacencies(node)
+
+        # Recursive eval
+        for adjacency in adjacencies:
+            if adjacency in self._result:
+                continue
+            self._previous[adjacency] = node
+            self.run(adjacency)
+
+        # Evaluate current state
+        self._result[node] = self.evaluate(node, adjacencies)
+
+    def evaluate(self, node, adjacencies):
+        return 0

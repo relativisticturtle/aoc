@@ -4,10 +4,9 @@ from aoc_utils import get_input
 import aoc
 
 
-
 def test_search_on_2022_12():
     # Parse indata
-    indata = get_input(12, 2022)
+    indata = get_input(12, 2022, silent=True)
     L = indata.splitlines(keepends=False)
     M = np.array([list(l) for l in L])
     S = np.where(M=='S')
@@ -18,31 +17,30 @@ def test_search_on_2022_12():
     M[stop] = 'z'
 
     # Define search
-    class Search(aoc.Search):
+    class Search(aoc.BFS):
         def finished(self, state):
             return state == stop
         
-        def candidates(self, from_state):
+        def adjacencies(self, node):
             return [
-                neighbor for neighbor in aoc.neighbors(from_state)
-                if aoc.in_range(neighbor, M.shape) and ord(M[neighbor]) <= ord(M[from_state]) + 1
+                neighbor for neighbor in aoc.neighbors(node)
+                if aoc.in_range(neighbor, M.shape) and ord(M[neighbor]) <= ord(M[node]) + 1
             ]
 
-    search = Search(start)
-    goal_state = search.run()
-    result1 = search.total_cost(goal_state)
-    assert result1 == 472 # Part 1 (with my input)
+    # Part 1
+    answer = Search().append_initial(start).run().get_result()
+    assert answer == 472
 
+    # Part 2
     S = np.where(M=='a')
-    search = Search(initial_states=list(zip(list(S[0]), list(S[1]))))
-    goal_state = search.run()
-    result1 = search.total_cost(goal_state)
-    assert result1 == 465 # Part 2 (with my input)
+    initial_positions = list(zip(list(S[0]), list(S[1])))
+    answer = Search().extend_initial(initial_positions).run().get_result()
+    assert answer == 465
 
 
 def nyi_test_search_on_2022_16():
     # Parse indata
-    indata = get_input(16, 2022)
+    indata = get_input(16, 2022, silent=True)
     maze = dict()
     for l in indata.splitlines(keepends=False):
         valve = l.split()[1]
@@ -54,7 +52,7 @@ def nyi_test_search_on_2022_16():
 
 def test_search_on_2021_09():
     # Parse indata
-    indata = get_input(9, 2021)
+    indata = get_input(9, 2021, silent=True)
     M = np.array([[int(x) for x in l] for l in indata.splitlines(keepends=False)])
 
     # Part 1
@@ -72,19 +70,60 @@ def test_search_on_2021_09():
     assert answer == 633
 
     # Part 2
-    class Search(aoc.Search):
-        def candidates(self, from_state):
+    class Search(aoc.BFS):
+        def adjacencies(self, node):
             return [
-                neigh for neigh in aoc.neighbors(from_state)
-                if aoc.in_range(neigh, M.shape) and M[from_state] < M[neigh] and M[neigh] < 9
+                neigh for neigh in aoc.neighbors(node)
+                if aoc.in_range(neigh, M.shape) and M[node] < M[neigh] and M[neigh] < 9
             ]
     basin_sizes = []
     for i, j in low_points:
-        search = Search((i, j))
+        search = Search().append_initial((i, j))
         search.run()
-        basin_sizes.append(len(search.visited()))
+        basin_sizes.append(len(search.get_visited()))
     answer = np.prod(sorted(basin_sizes)[-3:])
     assert answer == 1050192
+
+
+def test_search_on_2020_07():
+    # IS THIS A SEARCH PROBLEM?
+    # (or can be?)
+    from collections import defaultdict
+
+    # Parse indata
+    indata = get_input(7, 2020, silent=True)
+    rules = dict()
+    canbein = defaultdict(list)
+    for l in indata.splitlines(keepends=False):
+        bag_color, content = tuple(l.split(' bags contain '))
+        if content == 'no other bags.':
+            bag_content = []
+        else:
+            bag_content = [(' '.join(x.split()[1:-1]), int(x.split()[0])) for x in content.split(', ')]
+            for c, i in bag_content:
+                canbein[c].append(bag_color)
+        rules[bag_color] = bag_content
+    
+    # Part 1
+    class Search(aoc.BFS):
+        def adjacencies(self, node):
+            return canbein[node]
+    answer = len(Search().append_initial('shiny gold').run().get_visited()) - 1
+    assert answer == 148
+
+    # Part 2
+    class Search(aoc.Recursive):
+        def adjacencies(self, node):
+            return [color for color, count in rules[node]]
+
+        def evaluate(self, node, adjacencies):
+            count = 1
+            for b, c in rules[node]:
+                count += c * self.get_result(b)
+            return count
+    
+    answer = Search().run('shiny gold').get_result() - 1
+    assert answer == 24867
 
 
 if __name__ == '__main__':
