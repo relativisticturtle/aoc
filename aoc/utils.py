@@ -6,7 +6,7 @@ from datetime import datetime
 
 def _download_input(day, year):
     url = 'https://adventofcode.com/%d/day/%d/input' % (year, day)
-    session_file = os.path.join(os.path.dirname(__file__), 'session.txt')
+    session_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'session.txt')
     # https://www.reddit.com/r/adventofcode/comments/z9dhtd/please_include_your_contact_info_in_the_useragent/
     user_agent = 'github.com/relativisticturtle/aoc by mxrten@gmail.com'
     
@@ -34,7 +34,7 @@ def get_input(day=None, year=None, test=None, silent=False):
     if day is None:
         day = int(os.path.basename(inspect.stack()[1].filename)[3:5])
 
-    year_folder = os.path.join(os.path.dirname(__file__), str(year))
+    year_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), str(year))
     if test is not None:
         filename = os.path.join(year_folder, 'input%02d_%s.txt' % (day, test))
         if not silent:

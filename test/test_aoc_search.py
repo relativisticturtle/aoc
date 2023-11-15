@@ -1,12 +1,11 @@
 import numpy as np
 
-from aoc_utils import get_input
 import aoc
 
 
 def test_search_on_2022_12():
     # Parse indata
-    indata = get_input(12, 2022, silent=True)
+    indata = aoc.get_input(12, 2022, silent=True)
     L = indata.splitlines(keepends=False)
     M = np.array([list(l) for l in L])
     S = np.where(M=='S')
@@ -17,30 +16,29 @@ def test_search_on_2022_12():
     M[stop] = 'z'
 
     # Define search
-    class Search(aoc.BFS):
-        def finished(self, state):
-            return state == stop
-        
-        def adjacencies(self, node):
-            return [
-                neighbor for neighbor in aoc.neighbors(node)
-                if aoc.in_range(neighbor, M.shape) and ord(M[neighbor]) <= ord(M[node]) + 1
-            ]
+    def finished(node):
+        return node == stop
+
+    def adjacencies(node):
+        return [
+            neighbor for neighbor in aoc.neighbors(node)
+            if aoc.in_range(neighbor, M.shape) and ord(M[neighbor]) <= ord(M[node]) + 1
+        ]
 
     # Part 1
-    answer = Search().append_initial(start).run().get_result()
+    answer = aoc.search.Path(adjacencies, None, finished).initial(start).run().result()
     assert answer == 472
 
     # Part 2
     S = np.where(M=='a')
-    initial_positions = list(zip(list(S[0]), list(S[1])))
-    answer = Search().extend_initial(initial_positions).run().get_result()
+    start_positions = set(zip(list(S[0]), list(S[1])))
+    answer = aoc.search.Path(adjacencies, None, finished).initial(start_positions).run().result()
     assert answer == 465
 
 
 def nyi_test_search_on_2022_16():
     # Parse indata
-    indata = get_input(16, 2022, silent=True)
+    indata = aoc.get_input(16, 2022, silent=True)
     maze = dict()
     for l in indata.splitlines(keepends=False):
         valve = l.split()[1]
@@ -52,7 +50,7 @@ def nyi_test_search_on_2022_16():
 
 def test_search_on_2021_09():
     # Parse indata
-    indata = get_input(9, 2021, silent=True)
+    indata = aoc.get_input(9, 2021, silent=True)
     M = np.array([[int(x) for x in l] for l in indata.splitlines(keepends=False)])
 
     # Part 1
@@ -70,17 +68,15 @@ def test_search_on_2021_09():
     assert answer == 633
 
     # Part 2
-    class Search(aoc.BFS):
-        def adjacencies(self, node):
-            return [
-                neigh for neigh in aoc.neighbors(node)
-                if aoc.in_range(neigh, M.shape) and M[node] < M[neigh] and M[neigh] < 9
-            ]
+    def adjacencies(node):
+        return [
+            neigh for neigh in aoc.neighbors(node)
+            if aoc.in_range(neigh, M.shape) and M[node] < M[neigh] and M[neigh] < 9
+        ]
     basin_sizes = []
     for i, j in low_points:
-        search = Search().append_initial((i, j))
-        search.run()
-        basin_sizes.append(len(search.get_visited()))
+        basin = aoc.search.Path(adjacencies).initial((i, j)).run().visited()
+        basin_sizes.append(len(basin))
     answer = np.prod(sorted(basin_sizes)[-3:])
     assert answer == 1050192
 
@@ -91,7 +87,7 @@ def test_search_on_2020_07():
     from collections import defaultdict
 
     # Parse indata
-    indata = get_input(7, 2020, silent=True)
+    indata = aoc.get_input(7, 2020, silent=True)
     rules = dict()
     canbein = defaultdict(list)
     for l in indata.splitlines(keepends=False):
@@ -105,24 +101,22 @@ def test_search_on_2020_07():
         rules[bag_color] = bag_content
     
     # Part 1
-    class Search(aoc.BFS):
-        def adjacencies(self, node):
-            return canbein[node]
-    answer = len(Search().append_initial('shiny gold').run().get_visited()) - 1
+    def adjacencies(node):
+        return canbein[node]
+    answer = len(aoc.search.Path(adjacencies).initial('shiny gold').run().visited()) - 1
     assert answer == 148
 
     # Part 2
-    class Search(aoc.Recursive):
-        def adjacencies(self, node):
-            return [color for color, count in rules[node]]
+    def adjacencies(node):
+        return [color for color, count in rules[node]]
 
-        def evaluate(self, node, adjacencies):
-            count = 1
-            for b, c in rules[node]:
-                count += c * self.get_result(b)
-            return count
+    def evaluate(node, adjacencies):
+        count = 1
+        for b, c in rules[node]:
+            count += c * adjacencies[b]
+        return count, None
     
-    answer = Search().run('shiny gold').get_result() - 1
+    answer = aoc.search.Recursive(adjacencies, evaluate).run('shiny gold').result() - 1
     assert answer == 24867
 
 

@@ -86,7 +86,7 @@ if __name__ == '__main__':
     # Initialize
     ROOT = os.path.dirname(os.path.dirname(__file__))
     sys.path.append(ROOT)
-    from aoc_utils import get_input, clipboard_set
+    from aoc.utils import get_input, clipboard_set
 
     # Get input data
     day = int(os.path.basename(__file__)[3:5])

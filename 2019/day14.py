@@ -2,7 +2,7 @@ import os
 import sys
 ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(ROOT)
-from aoc_utils import get_input, clipboard_set
+from aoc.utils import get_input, clipboard_set
 
 #import numpy as np
 #from matplotlib import pyplot as plt
