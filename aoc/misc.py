@@ -4,8 +4,15 @@ D5 = ((0, 1), (1, 0), (0, -1), (-1, 0), (0, 0))
 D8 = ((0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1))
 D9 = ((0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 0))
 
+# Arrows, when D4 is interpreted
+# - as (dx, dy)
+# - with positive y downwards (screen coordinates)
+V4 = 'v>^<'
+
+
 def neighbors(pos, dirs=D4):
     return [tuple(x + dx for x, dx in zip(pos, d)) for d in dirs]
+
 
 def in_range(x, lim1, lim2=None):
     # Compare scalars

@@ -2,10 +2,11 @@ import os
 import inspect
 import requests
 from datetime import datetime
+from dateutil import tz
 
 
 def _download_input(day, year):
-    url = 'https://adventofcode.com/%d/day/%d/input' % (year, day)
+    url = 'https://adventofcode.com/{}/day/{}/input'.format(year, day)
     session_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'session.txt')
     # https://www.reddit.com/r/adventofcode/comments/z9dhtd/please_include_your_contact_info_in_the_useragent/
     user_agent = 'github.com/relativisticturtle/aoc by mxrten@gmail.com'
@@ -56,7 +57,21 @@ def get_input(day=None, year=None, test=None, silent=False):
             print('Done!')
     else:
         print('No local file.')
+
+        # Check we are not trying to get problem too early
+        unlocks_at = datetime(int(year), 12, int(day), tzinfo=tz.gettz('UTC-5'))
+        now_EST = datetime.now(tz.gettz('UTC-5'))
+        if now_EST < unlocks_at:
+             raise RuntimeError('Problem hasn\'t been unlocked yet!')
+
+        # Download
         data = _download_input(day, year)
+
+        # Check server didn't give stern reply
+        please_dont = 'Please don\'t repeatedly request this endpoint before it unlocks!'
+        if data.startswith(please_dont):
+             raise RuntimeError(please_dont)
+
         if not data:
             return None
         print('Storing locally as \'%s\'...' % filename)

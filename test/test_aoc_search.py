@@ -107,16 +107,16 @@ def test_search_on_2020_07():
     assert answer == 148
 
     # Part 2
-    def adjacencies(node):
+    def children(node):
         return [color for color, count in rules[node]]
 
     def evaluate(node, adjacencies):
         count = 1
         for b, c in rules[node]:
             count += c * adjacencies[b]
-        return count, None
-    
-    answer = aoc.search.Recursive(adjacencies, evaluate).run('shiny gold').result() - 1
+        return count
+
+    answer = aoc.search.Recursive(children, evaluate).run('shiny gold').result() - 1
     assert answer == 24867
 
 

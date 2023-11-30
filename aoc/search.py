@@ -52,7 +52,7 @@ class Search:
         """Get path from start to this node (or finish-node if unspecified)"""
         path = [node if node is not None else self._finish]
         while path[-1] in self._previous:
-            path.append(self._previous[path-1])
+            path.append(self._previous[path[-1]])
         return path[::-1]
 
     def run(self, *args, **kwargs):
@@ -191,24 +191,18 @@ class Recursive(Search):
       - Default is False.
       - (Search proceeds until all reachable nodes have been visited)
     """
+    # TODO: Identify different patterns
+    #  - Recursive  : children found in advance, eval at end, memoization
+    #  - Parse      : children found 1 at a time, eval at end
+    #  - ...
     def __init__(self,
-                 adjacencies: Callable[[Any], Iterable],
+                 children: Callable[[Any], Iterable],
                  evaluate: Callable[[Any, Any], Union[int, float]],
                 ):
         super().__init__()
         self._result = dict()
-        self._adjacencies = adjacencies
-        self._evaluate = evaluate if evaluate is not None else _cost_default
-
-    def result(self, node=None):
-        """Get result from finish-node, or specified node
-
-        Returns None if result hasn't been evaluated yet.
-        """
-        if node is None:
-            return self._result.get(self._finish, None)
-        else:
-            return self._result.get(node, None)
+        self._children = children
+        self._evaluate = evaluate if evaluate is not None else _evaluate_default
 
     def run(self, node):
         # Top-node is finish
@@ -219,27 +213,18 @@ class Recursive(Search):
         return self
 
     def _run(self, node):
-        # Get adjacencies
-        adjacencies = deque(self._adjacencies(node))
-
         # Recursive eval
         subresults = dict()
-        while len(adjacencies) > 0:
-            adjacency = adjacencies.popleft()
-            if adjacency not in self._result:
+        for child in self._children(node):
+            if child not in self._result:
                 # Run for node. May emit a sibling-node
-                sibling = self._run(adjacency)
-                if sibling is not None:
-                    adjacencies.appendleft(sibling)
+                self._run(child)
 
                 # Set current node as parent-node
-                self._previous[adjacency] = node
+                self._previous[child] = node
 
             # Extract result of child-node
-            subresults[adjacency] = self._result[adjacency]
+            subresults[child] = self._result[child]
 
         # Evaluate current state
-        self._result[node], sibling = self._evaluate(node, subresults)
-
-        # Return sibling-node
-        return sibling
+        self._result[node] = self._evaluate(node, subresults)
