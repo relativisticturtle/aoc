@@ -1,9 +1,9 @@
-import os
-import sys
 import numpy as np
 
 def run(indata):
     L = indata.splitlines(keepends=False)
+    #L = [block.splitlines(keepends=False) for block in indata.split('\n\n')]
+    #L = [int(x) for x in indata.split(',')]
     
     # ----------- PART 1 -----------
     #
