@@ -60,17 +60,19 @@ class Search:
 
 
 class Path(Search):
-    """Base class for path-searches
+    """Path search
 
-    - cost() is cost of going to next node.
-      - Default is 1.
-
-    - heuristic() is minimal cost to finish.
-      - Default is 0.
-
-    - finished() checks whether goal has been reached.
-      - Default is False.
-      - (Search proceeds until all reachable nodes have been visited)
+    Parameters
+    ----------
+    adjacencies : callable
+        Function that takes a node and return its adjacencies.
+    cost : callable
+        Cost of going from a node to an adjacency. Default is 1.
+    finished : callable
+        Function that checks whether goal has been reached. Default is False.
+        (Search proceeds until all reachable nodes have been visited)
+    heuristic : callable
+        Lower bound of remaining cost from a node to finish. Default is 0.
     """
 
     def __init__(self,
@@ -182,14 +184,14 @@ class Path(Search):
 
 
 class Recursive(Search):
-    """Base class for recursive searches
-    
-    - evaluate() is result of current node - knowing the result of all child-nodes.
-      - Default is 1.
-    
-    - finished() checks whether goal has been reached.
-      - Default is False.
-      - (Search proceeds until all reachable nodes have been visited)
+    """Recursive search
+
+    Parameters
+    ----------
+    children : callable
+        Function that takes a node and return its children.
+    evaluate : callable
+        Evaluation-function, taking a node and its (already) evaluated children
     """
     # TODO: Identify different patterns
     #  - Recursive  : children found in advance, eval at end, memoization

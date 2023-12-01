@@ -2,6 +2,23 @@ import numpy as np
 from aoc import in_range
 
 class Set2D:
+    """Utility structure for 2D (integer) points
+
+    Parameters
+    ----------
+    x, y : array-like
+        X- and Y-coordinates
+    values : array-like
+        Values at each coordinate
+    colors : dict
+        How the values are printed / scanned
+    default_value : scalar
+        Value to fill array with as default
+    default_color : U8
+        Character to print with as default
+    missing_color : U8
+        Character to print when value is not in colors' value-lookup
+    """
     def __init__(self, x, y=None, values=None, colors=None, default_value=0, default_color='.', missing_color='%'):
         if y is not None:
             self.points = np.column_stack([x, y])
