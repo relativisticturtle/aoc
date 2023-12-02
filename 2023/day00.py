@@ -1,4 +1,5 @@
 import numpy as np
+import aoc
 
 def run(indata):
     L = indata.splitlines(keepends=False)

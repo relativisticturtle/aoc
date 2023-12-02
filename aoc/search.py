@@ -50,8 +50,14 @@ class Search:
     
     def path_to(self, node=None):
         """Get path from start to this node (or finish-node if unspecified)"""
-        path = [node if node is not None else self._finish]
-        while path[-1] in self._previous:
+        node = node if node is not None else self._finish
+        if self._previous.get(node, None) is None:
+            # No path found to this node (yet)
+            return None
+
+        # Work backwards from node
+        path = [node]
+        while self._previous.get(path[-1], None) is not None:
             path.append(self._previous[path[-1]])
         return path[::-1]
 
