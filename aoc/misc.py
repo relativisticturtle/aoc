@@ -10,8 +10,30 @@ D9 = ((0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 
 V4 = 'v>^<'
 
 
-def neighbors(pos, dirs=D4):
-    return [tuple(x + dx for x, dx in zip(pos, d)) for d in dirs]
+def neighbors(pos, dirs=D4, lim=None):
+    if lim is not None:
+        if len(lim) == 1 and hasattr(lim[0], '__len__'):
+            assert len(lim[0]) == len(pos), 'lim-length must be same as pos-length'
+            min_lim = [0] * len(lim[0])
+            max_lim = lim[0]
+        elif len(lim) == 2 and hasattr(lim[0], '__len__') and hasattr(lim[1], '__len__'):
+            assert len(lim[0]) == len(pos), 'lim-length must be same as pos-length'
+            assert len(lim[1]) == len(pos), 'lim-length must be same as pos-length'
+            min_lim = lim[0]
+            max_lim = lim[1]
+        else:
+            assert len(lim) == len(pos), 'lim-length must be same as pos-length'
+            min_lim = [0] * len(lim)
+            max_lim = lim
+
+        neigh = []
+        for d in dirs:
+            p = tuple(x + dx for x, dx in zip(pos, d))
+            if all([mn <= q and q < mx for q, mn, mx in zip(p, min_lim, max_lim)]):
+                neigh.append(p)
+        return neigh
+    else:
+        return [tuple(x + dx for x, dx in zip(pos, d)) for d in dirs]
 
 
 def in_range(x, lim1, lim2=None):
