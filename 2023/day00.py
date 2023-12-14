@@ -22,7 +22,7 @@ if __name__ == '__main__':
     from aoc.utils import get_input, clipboard_set
 
     # Get input data
-    indata = get_input()
+    indata = get_input() #test='test')
     
     # Run
     answer = run(indata)
