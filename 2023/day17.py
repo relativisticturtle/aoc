@@ -23,20 +23,17 @@ def run(indata):
 
     def finished(p):
         return (p[0] == M.shape[0] - 1) and (p[1] == M.shape[1] - 1)
-    
-    def heuristic(p):
-        return (M.shape[0] - p[0]) + (M.shape[1] - p[1])
 
     # ----------- PART 1 -----------
     #
     adjacent1 = lambda p: adjacent(p, 1, 3)
-    answer = aoc.search.Path(adjacent1, cost, finished, heuristic).initial({(0, 0, 1, 0), (0, 0, 0, 1)}).run().result()
+    answer = aoc.search.Path(adjacent1, cost, finished).initial({(0, 0, 1, 0), (0, 0, 0, 1)}).run().result()
     print("Part 1: {}".format(answer)) # 1001
     
     # ----------- PART 2 -----------
     #
     adjacent1 = lambda p: adjacent(p, 4, 10)
-    answer = aoc.search.Path(adjacent1, cost, finished, heuristic).initial({(0, 0, 1, 0), (0, 0, 0, 1)}).run().result()
+    answer = aoc.search.Path(adjacent1, cost, finished).initial({(0, 0, 1, 0), (0, 0, 0, 1)}).run().result()
     print("Part 2: {}".format(answer)) # 1197
 
 
