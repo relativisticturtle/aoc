@@ -18,6 +18,7 @@ __pycache__/
 
 # AoC input files
 input*.txt
+leaderboard.json
 
 # Session-file
 session.txt

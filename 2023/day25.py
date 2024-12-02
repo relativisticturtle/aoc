@@ -38,6 +38,7 @@ def run(indata):
     path1 = aoc.search.Path(adjacent).initial(xnodes[0]).run().path_to(xnodes[1])
     edges1 = [(path1[i], path1[i+1]) for i in range(len(path1) - 1)]
     # Optional reshuffle, so that look at middle edges first, for optimization
+    #count = 0
     #import itertools
     #edges1 = list(itertools.chain(*zip(edges1[len(edges1)//2:], edges1[:len(edges1)//2][::-1] + [('x', 'x')]*(len(edges1)%2))))
     for e1 in edges1:
@@ -55,6 +56,7 @@ def run(indata):
             #edges3 = list(itertools.chain(*zip(edges3[len(edges3)//2:], edges3[:len(edges3)//2][::-1] + [('x', 'x')]*(len(edges3)%2))))
 
             for e3 in edges3:
+                #count += 1
                 removed_edges.append(e3)
                 search = aoc.search.Path(adjacent).initial(xnodes[0]).run()
                 path4 = search.path_to(xnodes[1])
@@ -69,6 +71,7 @@ def run(indata):
         if answer: break
         removed_edges.pop()
 
+    #print(count)
     print("Part 1: {}".format(answer))
     
     # ----------- PART 2 -----------
