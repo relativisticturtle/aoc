@@ -29,7 +29,7 @@ def _download_leaderboard(year, leaderboard_id):
         return None
 
 
-def get_leaderboard(year=None, leaderboard_id='4232372', cache_timeout=3600):
+def get_leaderboard(year=None, leaderboard_id='4232372', cache_timeout=900):
     if year is None:
         year = dt.now().year
 
