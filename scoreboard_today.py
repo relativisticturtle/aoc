@@ -1,6 +1,7 @@
 import os
-import requests
+import sys
 import json
+import requests
 from datetime import datetime as dt
 from datetime import timezone as tz
 
@@ -101,7 +102,12 @@ def verbose(time):
 
 
 if __name__ == '__main__':
-    leaderboard, star_podium = leaderboard_to_table(get_leaderboard())
+    if len(sys.argv) > 1:
+        day = sys.argv[1]
+    else:
+        day = None
+    
+    leaderboard, star_podium = leaderboard_to_table(get_leaderboard(), day)
 
     for name, star1, star2, local_score in leaderboard:
         if star1 is None:
