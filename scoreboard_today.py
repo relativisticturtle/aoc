@@ -63,7 +63,7 @@ def leaderboard_to_table(leaderboard, day=None):
     problem_start = dt(year, 12, int(day), 5, tzinfo=tz.utc)
 
     results = []
-    for id, member in leaderboard['members'].items():
+    for member in leaderboard['members'].values():
         results.append([member['name']])
         for star in ['1', '2']:
             try:
@@ -79,6 +79,10 @@ def leaderboard_to_table(leaderboard, day=None):
         tuple(a[0] for a in sorted(results, key=lambda x: (x[s] or 1e12) if x[s] is None else x[s].seconds)[:3])
         for s in [1, 2]
     )
+
+    for member in leaderboard['members'].values():
+        if member['global_score'] > 0:
+            print('\n\nGLOBAL SCORE by {}: {}\n\n'.format(member['name'], member['global_score']))
 
     return results, star_podium
 
