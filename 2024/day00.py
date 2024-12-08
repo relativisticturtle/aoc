@@ -11,12 +11,13 @@ def run(indata):
     #
     answer = None
     print("Part 1: {}".format(answer))
+    return answer
     
     # ----------- PART 2 -----------
     #
-    #answer = None
+    answer = None
     print("Part 2: {}".format(answer))
-    
+    return answer
 
 if __name__ == '__main__':
     # Initialize
