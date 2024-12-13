@@ -19,6 +19,7 @@ def run(indata):
     print("Part 2: {}".format(answer))
     return answer
 
+
 if __name__ == '__main__':
     # Initialize
     from aoc.utils import get_input, clipboard_set
