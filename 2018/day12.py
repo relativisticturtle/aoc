@@ -16,14 +16,14 @@ def run(indata):
         next_start = start + x1 - 2
         return next_pots, next_start
 
-    e = aoc.simul.EvolutionWithMetadata(evolve, S0, 0).run(20)
+    e = aoc.simul.Evolution(evolve, S0, 0).run(20)
     pots, start = e.history()
     answer = sum([(start + i) if c == '#' else 0 for i, c in enumerate(pots)])
     print("Part 1: {}".format(answer)) # 2823
 
     # ----------- PART 2 -----------
     #
-    pots, loops, start1, start2 = e.run().extrapolate(50000000000)
+    pots, loops, start1, start2 = e.run().extrapolate_with_data(50000000000)
     start = start1 + (start2 - start1) * loops
     answer = sum([(start + i) if c == '#' else 0 for i, c in enumerate(pots)])
     print("Part 2: {}".format(answer)) # 2900000001856

@@ -1,9 +1,13 @@
 from typing import Callable, Any, Iterable, Union, Hashable, Tuple
 from typing_extensions import Self
+from inspect import signature
 
 
 class Evolution:
-    """Model the evolution of a system
+    """Model the evolution of a system, with optional metadata
+
+    The metadata may be, e.g., an offset that increases every loop,
+    but should otherwise not affect the evolution.
 
     Parameters
     ----------
@@ -11,17 +15,36 @@ class Evolution:
         Takes a state and returns the next.
     initial_state : immutable
         Initial state of the system.
+    initial_data : Any
+        Initial metadata.
     """
-    def __init__(self, evolve, initial_state):
+    def __init__(self, evolve, initial_state, initial_data=None):
+        parameters = signature(evolve).parameters
+        if len(parameters) == 1:
+            # Only state
+            assert initial_data is None, 'Cannot have evolve(state) with data'
+            self._with_data = False
+        elif len(parameters) == 2:
+            # State and data
+            assert initial_data is not None, 'Cannot have evolve(state, data) without data'
+            self._with_data = True
+        else:
+            raise RuntimeError('Must be evolve(state) or evolve(state, data)')
+
         self._evolve = evolve
         self._visited = {initial_state: 0}
         self._revisit = None
-        self._history = [initial_state]
+        self._history = [(initial_state, initial_data) if self._with_data else initial_state]
 
     def run(self, max_iter=-1):        
         while self._revisit is None and (max_iter == -1 or len(self._history) <= max_iter):
             # Evolve from latest
-            state = self._evolve(self._history[-1])
+            if self._with_data:
+                result = self._evolve(*self._history[-1])
+                state = result[0]
+            else:
+                result = self._evolve(self._history[-1])
+                state = result
             
             # Check if repeated state
             if state in self._visited:
@@ -30,7 +53,7 @@ class Evolution:
                 self._visited[state] = len(self._history)
             
             # Record and continue(?)
-            self._history.append(state)
+            self._history.append(result)
         return self
 
     def history(self, t=-1):
@@ -68,45 +91,8 @@ class Evolution:
         hit1 = self._revisit
         dt = self.loop_offset(t)
         return self._history[hit1 + dt]
-
-
-class EvolutionWithMetadata(Evolution):
-    """Model the evolution of a system, with additional metadata
-
-    The metadata may be, e.g., an offset that increases every loop,
-    but should otherwise not affect the evolution.
-
-    Parameters
-    ----------
-    evolve : callable
-        Takes a state + metadata and returns the next state + metadata.
-    initial_state : immutable
-        Initial state of the system.
-    initial_data : Any
-        Initial metadata.
-    """
-    def __init__(self, evolve, initial_state, initial_data):
-        super().__init__(evolve, initial_state)
-        # There is some meta-data (offset or similar) we would
-        # like to record, but does not affect the evolution.
-        self._history = [(initial_state, initial_data)]
-
-    def run(self, max_iter=-1):        
-        while self._revisit is None and (max_iter == -1 or len(self._history) <= max_iter):
-            # Evolve from latest
-            state, data = self._evolve(*self._history[-1])
-            
-            # Check if repeated state
-            if state in self._visited:
-                self._revisit = self._visited[state]
-            else:
-                self._visited[state] = len(self._history)
-            
-            # Record and continue(?)
-            self._history.append((state, data))
-        return self
-
-    def extrapolate(self, t):
+    
+    def extrapolate_with_data(self, t):
         """Return state, #loops, and the reoccurence pairs' metadata for the given time"""
         hit1, hit2 = self.reoccurence()
         loops = self.loop_number(t)
